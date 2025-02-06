@@ -1,23 +1,23 @@
-"use client";
+import React, { useState, useEffect } from 'react';
 import {
-  Blocks,
-  Bot,
-  Brain,
-  ChevronDown,
-  Database,
-  FileCode,
-  GitBranch,
-  Layout,
-  Plus,
   Send,
-  Settings,
+  Bot,
+  FileCode,
   Shield,
-  Terminal,
-  Trash2,
+  Zap,
+  Blocks,
   Wallet,
-  Zap
+  Brain,
+  Layout,
+  ChevronDown,
+  Settings,
+  Terminal,
+  Database,
+  GitBranch,
+  Plus,
+  Trash2,
+  Download
 } from 'lucide-react';
-import React, { useState } from 'react';
 
 interface Message {
   id: number;
@@ -45,6 +45,7 @@ interface ProjectType {
 }
 
 export default function Home() {
+  // UI State
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -52,6 +53,8 @@ export default function Home() {
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [showAgentSelect, setShowAgentSelect] = useState(false);
+
+  // Requirements & Contract Generation
   const [requirements, setRequirements] = useState<string[]>([]);
   const [currentRequirement, setCurrentRequirement] = useState('');
   const [generatedContract, setGeneratedContract] = useState('');
@@ -105,6 +108,90 @@ export default function Home() {
     }
   ];
 
+  // Pre-fill default data on first load
+  useEffect(() => {
+    // Example: Preselect NFT project
+    setSelectedProject('nft');
+    // Example: Preselect the Architect agent
+    setSelectedAgent('architect');
+    // Example: Pre-populate some requirements
+    const defaultRequirements = [
+      'Users can mint their own NFTs',
+      'Contract should track total supply',
+      'Only owner can change the baseURI',
+      'Emit an event upon each successful mint'
+    ];
+    setRequirements(defaultRequirements);
+    
+    // Generate an initial contract
+    generateContract(defaultRequirements);
+  }, []);
+
+  // Add a new requirement to the list
+  const addRequirement = () => {
+    if (!currentRequirement.trim()) return;
+    const updated = [...requirements, currentRequirement];
+    setRequirements(updated);
+    setCurrentRequirement('');
+    generateContract(updated);
+  };
+
+  // Remove a requirement from the list
+  const removeRequirement = (index: number) => {
+    const updated = requirements.filter((_, i) => i !== index);
+    setRequirements(updated);
+    generateContract(updated);
+  };
+
+  // Generate a mock smart contract & suggestions based on current requirements
+  const generateContract = (reqs?: string[]) => {
+    const finalReqs = reqs || requirements;
+    const contractCode = `// Generated Smart Contract
+// Requirements:
+${finalReqs.map((r, i) => `// ${i + 1}. ${r}`).join('\n')}
+
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract MyNFT is ERC721, Ownable {
+    uint256 public totalMinted;
+
+    constructor() ERC721("MyNFT", "MNFT") {
+        // constructor logic
+    }
+
+    function mint() external {
+        // 1. Check any conditions if needed
+        // 2. Mint the NFT to msg.sender
+        _safeMint(msg.sender, totalMinted + 1);
+        totalMinted += 1;
+
+        // 3. Emit an event
+        emit Minted(msg.sender, totalMinted);
+    }
+
+    // Only owner can change base URI
+    function setBaseURI(string memory baseURI) external onlyOwner {
+        // Implementation for setting a new base URI
+    }
+
+    event Minted(address indexed minter, uint256 tokenId);
+}`;
+
+    setGeneratedContract(contractCode);
+
+    // Mock AI suggestions
+    const suggestions = [
+      'Add a pausable mechanism to halt minting if needed.',
+      'Implement a royalty or fee mechanism for secondary sales.',
+      'Integrate an Access Control library for fine-grained permissions.'
+    ];
+    setAiSuggestions(suggestions);
+  };
+
+  // Chat message handler
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -116,18 +203,17 @@ export default function Home() {
       timestamp: new Date()
     };
 
+    // AI response uses the latest generated contract & suggestions
     const aiResponse: Message = {
       id: messages.length + 2,
-      content: "Based on your input and requirements, here's a draft of your smart contract.",
+      content: 'Here’s an updated contract snippet based on your input. Check the code preview for more details!',
       sender: 'ai',
       agentType: selectedAgent,
       timestamp: new Date(),
-      codeBlocks: [generatedContract || "// Your contract code will appear here"],
-      securityChecks: ["✓ Reentrancy Guard", "✓ Integer Overflow Protection"],
-      aiSuggestions: [
-        "Consider adding pausable functionality",
-        "Implement access control modifiers",
-        "Add events for important state changes"
+      codeBlocks: [generatedContract || '// Your contract code will appear here'],
+      securityChecks: ['✓ Reentrancy Guard', '✓ Integer Overflow Protection'],
+      aiSuggestions: aiSuggestions.length > 0 ? aiSuggestions : [
+        'Use OpenZeppelin libraries for safe math and ownership checks.'
       ]
     };
 
@@ -136,55 +222,19 @@ export default function Home() {
     setIsExpanded(true);
   };
 
-  const addRequirement = () => {
-    if (!currentRequirement.trim()) return;
-    setRequirements([...requirements, currentRequirement]);
-    setCurrentRequirement('');
-  };
-
-  const removeRequirement = (index: number) => {
-    setRequirements(requirements.filter((_, i) => i !== index));
-  };
-
-  const generateContract = () => {
-    const contractCode = `// Generated Smart Contract
-// Requirements:
-${requirements.map((req, i) => `// ${i + 1}. ${req}`).join("\n")}
-
-pragma solidity ^0.8.0;
-
-contract GeneratedContract {
-    // Contract logic based on provided requirements
-    address public owner;
-    bool public paused;
-
-    constructor() {
-        owner = msg.sender;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not authorized");
-        _;
-    }
-
-    modifier whenNotPaused() {
-        require(!paused, "Contract is paused");
-        _;
-    }
-
-    // TODO: Implement functions as per requirements
-}`;
-
-    setGeneratedContract(contractCode);
-    setAiSuggestions([
-      "Consider implementing ERC standards for compatibility",
-      "Add comprehensive error messages",
-      "Implement emergency pause functionality"
-    ]);
-  };
-
+  // Wallet Connection
   const handleConnectWallet = () => {
     setIsWalletConnected(true);
+  };
+
+  // Download contract as .sol file
+  const downloadContract = () => {
+    const element = document.createElement('a');
+    const file = new Blob([generatedContract], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = 'MyNFT.sol';
+    document.body.appendChild(element);
+    element.click();
   };
 
   return (
@@ -194,7 +244,7 @@ contract GeneratedContract {
         <button
           onClick={handleConnectWallet}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-            isWalletConnected
+            isWalletConnected 
               ? 'bg-green-100 text-green-700'
               : 'bg-blue-100 text-blue-700'
           }`}
@@ -211,10 +261,10 @@ contract GeneratedContract {
       {/* Main Content */}
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
         {!isExpanded ? (
-          // Initial Center Input State
+          // Initial view: project selection, agent selection, and requirements input
           <div className="w-full max-w-3xl text-center space-y-8">
             <h1 className="text-4xl font-bold text-gray-800">Smart Contract Assistant</h1>
-
+            
             {/* Project Type Selection */}
             <div className="grid grid-cols-3 gap-4 mb-8">
               {projectTypes.map(type => (
@@ -249,7 +299,6 @@ contract GeneratedContract {
                 </span>
                 <ChevronDown className="w-5 h-5 text-gray-500" />
               </button>
-
               {showAgentSelect && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 z-10">
                   {agents.map(agent => (
@@ -274,7 +323,7 @@ contract GeneratedContract {
               )}
             </div>
 
-            {/* Contract Requirements */}
+            {/* Contract Requirements Input */}
             <div className="bg-white p-6 rounded-2xl shadow-xl space-y-4">
               <h2 className="text-2xl font-bold text-gray-800">Contract Requirements</h2>
               <div className="flex gap-2">
@@ -284,7 +333,6 @@ contract GeneratedContract {
                   onChange={(e) => setCurrentRequirement(e.target.value)}
                   placeholder="Enter a requirement (e.g., 'Implement minting function')"
                   className="flex-1 p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onKeyPress={(e) => e.key === 'Enter' && addRequirement()}
                 />
                 <button
                   onClick={addRequirement}
@@ -293,43 +341,34 @@ contract GeneratedContract {
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
-
               {requirements.length > 0 && (
                 <ul className="space-y-2 text-left">
                   {requirements.map((req, index) => (
                     <li key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-xl">
                       <span>{req}</span>
-                      <button
-                        onClick={() => removeRequirement(index)}
-                        className="text-red-500 hover:text-red-600 transition-colors"
-                      >
+                      <button onClick={() => removeRequirement(index)} className="text-red-500">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
-
               <button
-                onClick={generateContract}
-                disabled={requirements.length === 0}
-                className={`w-full p-3 rounded-xl transition-colors ${
-                  requirements.length > 0
-                    ? 'bg-green-500 hover:bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                }`}
+                onClick={() => generateContract()}
+                className="mt-4 bg-green-500 text-white p-3 rounded-xl hover:bg-green-600 transition-colors w-full"
               >
                 Generate Contract
               </button>
             </div>
 
-            {/* Chat Input */}
+            {/* Additional Chat Input */}
             <form onSubmit={handleSend} className="relative">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask questions or request modifications..."
+                onFocus={() => setIsExpanded(true)}
+                placeholder="Describe any additional requirements or ask for changes..."
                 className="w-full p-6 rounded-2xl border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-lg"
               />
               <button
@@ -341,14 +380,13 @@ contract GeneratedContract {
             </form>
           </div>
         ) : (
-          // Expanded Chat Interface with Split View
+          // Expanded view: Split-screen chat and contract preview sections
           <div className="w-full max-w-7xl grid grid-cols-12 gap-6 mt-20">
-            {/* Left Side - Chat */}
+            {/* Left Side - Chat Interface */}
             <div className="col-span-4 bg-white rounded-2xl shadow-xl h-[800px] flex flex-col">
               <div className="p-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-800">Chat with AI Agent</h2>
               </div>
-
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {messages.map((message) => (
                   <div
@@ -376,18 +414,24 @@ contract GeneratedContract {
                       }`}
                     >
                       <p className="text-sm">{message.content}</p>
-                      {message.aiSuggestions && (
-                        <div className="mt-2 text-xs space-y-1">
+                      {/* Display code blocks, if any */}
+                      {message.codeBlocks?.length ? (
+                        <pre className="mt-2 bg-gray-800 text-green-200 p-2 rounded-md text-xs overflow-x-auto">
+                          {message.codeBlocks.join("\n")}
+                        </pre>
+                      ) : null}
+                      {/* Display AI suggestions, if any */}
+                      {message.aiSuggestions?.length ? (
+                        <ul className="mt-2 text-xs text-yellow-800 list-disc list-inside">
                           {message.aiSuggestions.map((suggestion, idx) => (
-                            <p key={idx} className="text-blue-700">• {suggestion}</p>
+                            <li key={idx}>{suggestion}</li>
                           ))}
-                        </div>
-                      )}
+                        </ul>
+                      ) : null}
                     </div>
                   </div>
                 ))}
               </div>
-
               <form onSubmit={handleSend} className="p-4 border-t border-gray-100">
                 <div className="flex gap-2">
                   <input
@@ -407,15 +451,15 @@ contract GeneratedContract {
               </form>
             </div>
 
-            {/* Right Side - Contract Preview & Analysis */}
+            {/* Right Side - Contract Preview, Security Analysis, and AI Suggestions */}
             <div className="col-span-8 space-y-6">
-              {/* Code Preview */}
+              {/* Contract Code Preview */}
               <div className="bg-white rounded-2xl shadow-xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-semibold text-gray-800">Smart Contract Preview</h2>
                   <div className="flex gap-2">
-                    <button className="p-2 rounded-lg hover:bg-gray-100">
-                      <FileCode className="w-5 h-5 text-gray-600" />
+                    <button onClick={downloadContract} className="p-2 rounded-lg hover:bg-gray-100">
+                      <Download className="w-5 h-5 text-gray-600" />
                     </button>
                     <button className="p-2 rounded-lg hover:bg-gray-100">
                       <Settings className="w-5 h-5 text-gray-600" />
@@ -427,7 +471,7 @@ contract GeneratedContract {
                 </div>
               </div>
 
-              {/* Security Analysis */}
+              {/* Security Analysis Section */}
               <div className="bg-white rounded-2xl shadow-xl p-6">
                 <h2 className="font-semibold text-gray-800 mb-4">Security Analysis</h2>
                 <div className="space-y-3">
@@ -440,17 +484,18 @@ contract GeneratedContract {
                 </div>
               </div>
 
-              {/* AI Suggestions */}
+              {/* AI Suggestions Section */}
               <div className="bg-white rounded-2xl shadow-xl p-6">
                 <h2 className="font-semibold text-gray-800 mb-4">AI Suggestions</h2>
-                <div className="space-y-3">
-                  {aiSuggestions.map((suggestion, i) => (
-                    <div key={i} className="flex items-center gap-2 text-blue-700 bg-blue-50 p-3 rounded-lg">
-                      <Brain className="w-5 h-5" />
-                      <span className="text-sm">{suggestion}</span>
-                    </div>
-                  ))}
-                </div>
+                <ul className="list-disc pl-5 text-sm text-gray-700">
+                  {aiSuggestions.length > 0 ? (
+                    aiSuggestions.map((suggestion, idx) => (
+                      <li key={idx}>{suggestion}</li>
+                    ))
+                  ) : (
+                    <li>No suggestions available yet. Generate contract to see AI suggestions.</li>
+                  )}
+                </ul>
               </div>
             </div>
           </div>
