@@ -18,23 +18,23 @@ import {
   GitBranch,
   Plus,
   Trash2,
-  Download
+  Download,
+  Menu,
+  XCircle
 } from 'lucide-react';
 
 /* -------------------------------------------------------------------
   TYPES & INTERFACES
-   - For messages, AI agents, project types, file data, etc.
 ---------------------------------------------------------------------*/
-
 interface Message {
   id: number;
   content: string;
   sender: 'user' | 'ai';
-  agentType?: string;
+  agentId: string;          // which agent this message belongs to
   timestamp: Date;
-  codeBlocks?: string[];      // Possibly store multiple code snippets from AI
-  securityChecks?: string[];  // Store a list of recommended security checks
-  aiSuggestions?: string[];   // Additional AI suggestions or tips
+  codeBlocks?: string[];
+  securityChecks?: string[];
+  aiSuggestions?: string[];
 }
 
 interface Agent {
@@ -64,44 +64,48 @@ interface ChatModel {
 
 /* -------------------------------------------------------------------
   MULTI-FILE EDITOR COMPONENT
-   - Displays tabs for each file (Solidity, README, configs, etc.)
-   - Uses Monaco Editor for advanced code editing
+  - Tabbed file editor using Monaco
+  - Displays a "Security Checks" panel at the bottom
 ---------------------------------------------------------------------*/
 interface MultiFileEditorProps {
   files: CodeFile[];
   setFiles: React.Dispatch<React.SetStateAction<CodeFile[]>>;
+  latestSecurityChecks: string[];  // Show latest checks for each AI output
 }
 
-const MultiFileEditor: React.FC<MultiFileEditorProps> = ({ files, setFiles }) => {
-  // Tracks which file (tab) is currently active
+const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
+  files,
+  setFiles,
+  latestSecurityChecks
+}) => {
+  // track which file is active
   const [activeTab, setActiveTab] = useState(0);
 
-  // Called whenever the editor value changes
   const handleEditorChange = (value: string | undefined) => {
-    const updatedFiles = [...files];
-    updatedFiles[activeTab].content = value || "";
-    setFiles(updatedFiles);
+    if (!files[activeTab]) return;
+    const updated = [...files];
+    updated[activeTab].content = value || "";
+    setFiles(updated);
   };
 
   return (
     <div className="flex flex-col h-full">
-      {/* File Tab Navigation */}
+      {/* Tabs */}
       <div className="flex border-b">
         {files.map((file, idx) => (
           <button
             key={idx}
             onClick={() => setActiveTab(idx)}
-            className={`px-4 py-2 border-t border-l border-r ${
-              activeTab === idx ? "bg-white font-bold" : "bg-gray-200"
-            }`}
+            className={`px-4 py-2 border-t border-l border-r 
+              ${activeTab === idx ? "bg-white font-bold" : "bg-gray-200"}`}
           >
             {file.name}
           </button>
         ))}
       </div>
 
-      {/* Monaco Editor */}
-      <div className="flex-1">
+      {/* Code Editor */}
+      <div className="flex-1 relative bg-gray-800">
         {files[activeTab] ? (
           <Editor
             height="100%"
@@ -115,12 +119,31 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({ files, setFiles }) =>
             theme="vs-dark"
             value={files[activeTab].content}
             onChange={handleEditorChange}
-            options={{ automaticLayout: true }}
+            options={{
+              automaticLayout: true,
+              fontSize: 14,
+              minimap: { enabled: true },
+              scrollbar: { verticalScrollbarSize: 8 }
+            }}
           />
         ) : (
           <div className="p-4 text-gray-500">
             No file selected.
           </div>
+        )}
+      </div>
+
+      {/* Security Checks Panel */}
+      <div className="bg-gray-100 p-4 border-t text-sm">
+        <h3 className="font-semibold mb-2">Security Checks</h3>
+        {latestSecurityChecks.length ? (
+          <ul className="list-disc list-inside text-gray-700 space-y-1">
+            {latestSecurityChecks.map((check, idx) => (
+              <li key={idx}>{check}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-gray-500">No new checks found.</p>
         )}
       </div>
     </div>
@@ -129,141 +152,133 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({ files, setFiles }) =>
 
 /* -------------------------------------------------------------------
   MAIN APP COMPONENT
-   - Manages states for project, agent, chat model, user input, etc.
-   - Displays the initial config UI or the expanded UI with chat + editor
+  - Collapsible sidebar
+  - Project-based approach
+  - Chat with multiple agents under the same project
+  - Research view for the selected project
+  - Right side: multi-file editor
 ---------------------------------------------------------------------*/
-
 function App() {
-  /* -----------------------
-     Primary UI states
-  -------------------------*/
-  const [isExpanded, setIsExpanded] = useState(false);        // Whether we've expanded to chat + editor
-  const [messages, setMessages] = useState<Message[]>([]);    // Chat messages
-  const [input, setInput] = useState('');                     // Current input typed by user
-  const [selectedAgent, setSelectedAgent] = useState<string>(''); // Which AI agent (e.g., Security Auditor)
+  // Collapsible sidebar
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Wallet
   const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<string>('');
-  const [showAgentSelect, setShowAgentSelect] = useState(false);
-  const [showModelSelect, setShowModelSelect] = useState(false);
 
-  /* ------------------------------------------------------------------
-     Requirements & Contract Generation
-  --------------------------------------------------------------------*/
-  const [requirements, setRequirements] = useState<string[]>([]);
-  const [currentRequirement, setCurrentRequirement] = useState('');
-  const [generatedContract, setGeneratedContract] = useState('');
-
-  /* ------------------------------------------------------------------
-     Multi-file editor state
-  --------------------------------------------------------------------*/
-  const [files, setFiles] = useState<CodeFile[]>([]);
-  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
-
-  /* ------------------------------------------------------------------
-     Agents, Project Types, and Chat Models
-       - Hardcoded for demonstration, but can be fetched or expanded
-  --------------------------------------------------------------------*/
+  // Agents (multiple)
   const agents: Agent[] = [
     {
-      id: 'architect',
-      name: 'Smart Contract Architect',
-      description: 'Designs and optimizes contract architecture',
+      id: 'research',
+      name: 'Research Agent',
+      description: 'Provides domain/market research & suggestions',
       icon: <Brain />
     },
     {
-      id: 'security',
-      name: 'Security Auditor',
-      description: 'Analyzes contracts for vulnerabilities',
-      icon: <Shield />
+      id: 'developer',
+      name: 'Developer Agent',
+      description: 'Implements the contract logic',
+      icon: <Terminal />
     },
     {
-      id: 'developer',
-      name: 'Contract Developer',
-      description: 'Implements and tests smart contracts',
-      icon: <Terminal />
+      id: 'auditor',
+      name: 'Auditor Agent',
+      description: 'Analyzes and audits the contract for vulnerabilities',
+      icon: <Shield />
     },
     {
       id: 'deployment',
       name: 'Deployment Specialist',
-      description: 'Handles contract deployment and verification',
+      description: 'Handles final deployment & verification steps',
       icon: <GitBranch />
     }
   ];
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('research');
 
-  // A “medium-difficulty” example: A DeFi protocol
+  // Project types
   const projectTypes: ProjectType[] = [
     {
       id: 'defi',
       name: 'DeFi Protocol',
-      description: 'Build decentralized finance applications (medium complexity)',
+      description: 'Medium-High complexity staking or yield strategies',
       icon: <Database />
     },
     {
       id: 'nft',
       name: 'NFT Platform',
-      description: 'Create NFT minting and marketplace solutions',
+      description: 'Minting, marketplace, and royalties',
       icon: <FileCode />
     },
     {
       id: 'dao',
       name: 'DAO Framework',
-      description: 'Develop decentralized autonomous organizations',
+      description: 'Governance tokens, proposals, and voting',
       icon: <Layout />
     }
   ];
+  const [selectedProject, setSelectedProject] = useState('defi');
 
-  // Example chat model selection
+  // Chat Model selection
   const chatModels: ChatModel[] = [
-    {
-      id: 'gpt-4',
-      name: 'OpenAI GPT-4',
-      description: 'Most advanced model by OpenAI'
-    },
-    {
-      id: 'gpt-3.5',
-      name: 'OpenAI GPT-3.5',
-      description: 'Streamlined for speed and cost'
-    },
-    {
-      id: 'custom-llm',
-      name: 'Custom LLM',
-      description: 'Your own fine-tuned model'
-    }
+    { id: 'gpt-4', name: 'OpenAI GPT-4', description: 'Advanced reasoning model' },
+    { id: 'gpt-3.5', name: 'OpenAI GPT-3.5', description: 'Faster, cost-effective solution' },
+    { id: 'custom-llm', name: 'Custom LLM', description: 'Bring-your-own fine-tuned model' }
   ];
-  const [selectedModel, setSelectedModel] = useState<string>('gpt-4'); // default model
+  const [selectedModel, setSelectedModel] = useState('gpt-4');
+
+  // Research view toggle
+  const [showResearchView, setShowResearchView] = useState(false);
+
+  // Chat messages for each agent
+  // We'll store them in a dictionary: agentId -> array of messages
+  const [agentMessages, setAgentMessages] = useState<{ [key: string]: Message[] }>({
+    research: [],
+    developer: [],
+    auditor: [],
+    deployment: []
+  });
+
+  // Requirements & contract generation
+  const [requirements, setRequirements] = useState<string[]>([]);
+  const [currentRequirement, setCurrentRequirement] = useState('');
+  const [generatedContract, setGeneratedContract] = useState('');
+
+  // Multi-file editor state
+  const [files, setFiles] = useState<CodeFile[]>([]);
+  const [latestSecurityChecks, setLatestSecurityChecks] = useState<string[]>([]);
+
+  // AI suggestions - stored for the latest AI response
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
 
   /* ------------------------------------------------------------------
-     Pre-fill data once on mount:
-       - Preselect DeFi project (medium difficulty)
-       - Preselect an agent
-       - Populate default DeFi-related requirements
-       - Generate initial code
+     useEffect: Initialize with an example project (DeFi),
+     default agent (research), etc.
   --------------------------------------------------------------------*/
   useEffect(() => {
-    // Preselect DeFi Protocol as an example
-    setSelectedProject('defi');
-
-    // Preselect the Architect agent
-    setSelectedAgent('architect');
-
-    // Pre-populate some "medium-difficulty" DeFi requirements
-    const defaultRequirements = [
-      'Users can stake tokens to earn yield',
-      'A reward pool is automatically distributed',
-      'Implement a penalty for early withdrawals',
-      'Ensure reentrancy protection on critical functions'
+    // Initialize requirements for a DeFi project
+    const defaultReqs = [
+      "Users can stake multiple token types for yield",
+      "A reward pool is distributed every 7 days",
+      "Penalties apply if users withdraw before the cycle ends",
+      "Integrate a governance token for fee adjustments",
+      "ReentrancyGuard to protect critical flows"
     ];
-    setRequirements(defaultRequirements);
+    setRequirements(defaultReqs);
 
-    // Generate an initial contract based on these requirements
-    generateContract(defaultRequirements);
+    // Generate an initial contract
+    generateContract(defaultReqs);
   }, []);
 
   /* ------------------------------------------------------------------
-     FUNCTION: addRequirement
-       - Adds a new requirement to the list
+     handleConnectWallet: Simulate connecting a user wallet
   --------------------------------------------------------------------*/
-  const addRequirement = () => {
+  const handleConnectWallet = () => {
+    setIsWalletConnected(true);
+  };
+
+  /* ------------------------------------------------------------------
+     handleAddRequirement & handleRemoveRequirement
+  --------------------------------------------------------------------*/
+  const handleAddRequirement = () => {
     if (!currentRequirement.trim()) return;
     const updated = [...requirements, currentRequirement];
     setRequirements(updated);
@@ -271,26 +286,18 @@ function App() {
     generateContract(updated);
   };
 
-  /* ------------------------------------------------------------------
-     FUNCTION: removeRequirement
-       - Removes a requirement from the list by index
-  --------------------------------------------------------------------*/
-  const removeRequirement = (index: number) => {
+  const handleRemoveRequirement = (index: number) => {
     const updated = requirements.filter((_, i) => i !== index);
     setRequirements(updated);
     generateContract(updated);
   };
 
   /* ------------------------------------------------------------------
-     FUNCTION: generateContract
-       - Produces a mock DeFi smart contract based on listed requirements
-       - Updates multi-file editor state with multiple files
+     generateContract: Create mock contract & populate editor
   --------------------------------------------------------------------*/
   const generateContract = (reqs?: string[]) => {
     const finalReqs = reqs || requirements;
-
-    // The contract below is just a mock for demonstration
-    const contractCode = `// Generated DeFi Smart Contract
+    const bigDefiContract = `// DeFi Protocol Contract (Advanced Example)
 // Requirements:
 ${finalReqs.map((r, i) => `// ${i + 1}. ${r}`).join('\n')}
 
@@ -299,557 +306,475 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract MyDeFiProtocol is ReentrancyGuard {
-    IERC20 public stakeToken;
+// Example advanced contract with multiple tokens & governance
+contract MyAdvancedDeFi is ReentrancyGuard {
+    IERC20 public stakeTokenA;
+    IERC20 public stakeTokenB;
+    address public governanceToken; // For voting/fee adjustments
+    
+    struct UserInfo {
+        uint256 amountA;    // Staked amount of Token A
+        uint256 amountB;    // Staked amount of Token B
+        uint256 lastStakeTime;
+    }
 
-    // A record of each user's staked balance
-    mapping(address => uint256) public stakedBalance;
-
-    // Define a reward pool and distribution rules
+    mapping(address => UserInfo) public userInfo;
     uint256 public rewardPool;
-    uint256 public earlyWithdrawalFee = 10; // 10%
-
-    constructor(address _token) {
-        stakeToken = IERC20(_token);
-        // Initialize reward pool or other logic
-        rewardPool = 1000000 ether; // Example large reward pool
+    uint256 public penaltyPeriod = 7 days;
+    uint256 public penaltyFee = 10; // 10%
+    
+    constructor(address _tokenA, address _tokenB, uint256 _initialRewards) {
+        stakeTokenA = IERC20(_tokenA);
+        stakeTokenB = IERC20(_tokenB);
+        rewardPool = _initialRewards;
     }
 
-    function stake(uint256 amount) external nonReentrant {
+    function stake(address token, uint256 amount) external nonReentrant {
         require(amount > 0, "Cannot stake zero tokens.");
-        stakeToken.transferFrom(msg.sender, address(this), amount);
-        stakedBalance[msg.sender] += amount;
-        // Additional logic for user shares
+        UserInfo storage user = userInfo[msg.sender];
+
+        if (token == address(stakeTokenA)) {
+            stakeTokenA.transferFrom(msg.sender, address(this), amount);
+            user.amountA += amount;
+        } else if (token == address(stakeTokenB)) {
+            stakeTokenB.transferFrom(msg.sender, address(this), amount);
+            user.amountB += amount;
+        } else {
+            revert("Unsupported staking token");
+        }
+
+        user.lastStakeTime = block.timestamp;
     }
 
-    function withdraw(uint256 amount) external nonReentrant {
-        require(amount <= stakedBalance[msg.sender], "Not enough staked tokens.");
-        // If withdrawing early, apply fee
-        uint256 fee = (amount * earlyWithdrawalFee) / 100;
-        uint256 finalAmount = amount - fee;
-        
-        stakedBalance[msg.sender] -= amount;
-        stakeToken.transfer(msg.sender, finalAmount);
-        // Fee could be sent to treasury or burned
+    function withdraw(address token, uint256 amount) external nonReentrant {
+        UserInfo storage user = userInfo[msg.sender];
+        if (token == address(stakeTokenA)) {
+            require(amount <= user.amountA, "Not enough staked token A.");
+            user.amountA -= amount;
+            _applyPenaltyAndTransfer(stakeTokenA, msg.sender, amount);
+        } else if (token == address(stakeTokenB)) {
+            require(amount <= user.amountB, "Not enough staked token B.");
+            user.amountB -= amount;
+            _applyPenaltyAndTransfer(stakeTokenB, msg.sender, amount);
+        } else {
+            revert("Unsupported token withdrawal");
+        }
     }
 
     function claimRewards() external nonReentrant {
-        // Distribute yield from rewardPool
-        // Implementation depends on staked share
+        // Implementation example:
+        // - Calculate user share
+        // - Transfer from rewardPool
     }
 
-    // Additional recommended functions / events:
-    // - function setEarlyWithdrawalFee(uint256 fee) external onlyOwner
-    // - function depositRewards(uint256 amount) external onlyOwner
-    // - function emergencyWithdraw() external onlyOwner
+    function _applyPenaltyAndTransfer(IERC20 token, address to, uint256 amount) internal {
+        UserInfo storage user = userInfo[to];
+        uint256 fee = 0;
+        if (block.timestamp < user.lastStakeTime + penaltyPeriod) {
+            fee = (amount * penaltyFee) / 100;
+        }
+        uint256 finalAmount = amount - fee;
+        token.transfer(to, finalAmount);
+        // The fee could remain in the contract or be distributed.
+    }
 }`;
 
-    setGeneratedContract(contractCode);
+    setGeneratedContract(bigDefiContract);
 
-    // Update the multi-file editor with new files
+    // Populate the editor with 3 files
     const initialFiles: CodeFile[] = [
-      { name: "MyDeFiProtocol.sol", content: contractCode },
-      { 
+      { name: "MyAdvancedDeFi.sol", content: bigDefiContract },
+      {
         name: "README.md",
-        content: `# MyDeFiProtocol
-This contract was generated with the following requirements:
+        content: `# MyAdvancedDeFi
+This contract was generated for a more advanced DeFi scenario:
 - ${finalReqs.join("\n- ")}
-
-**Key Features**:
-1. Users can stake tokens.
-2. Automatic reward pool distribution.
-3. Early withdrawal penalty.
-4. Reentrancy protection to secure critical flows.
-
-**Recommended Tools**:
-- OpenZeppelin libraries (ReentrancyGuard, IERC20).
-- Hardhat/Truffle for testing/deployment.
-        ` 
+      
+Includes multi-token staking, a penalty period, partial governance integration.`
       },
-      { 
-        name: "config.js",
-        content: `// Example Deployment Configuration
+      {
+        name: "deploy-config.js",
+        content: `// Example deployment config
 module.exports = {
   network: "goerli",
-  contractName: "MyDeFiProtocol",
-  constructorArgs: ["0xTokenContractAddressHere"],
+  tokenA: "0xTokenA...",
+  tokenB: "0xTokenB...",
+  initialRewards: "1000000000000000000000" // 1,000 tokens worth in Wei
 };`
       }
     ];
     setFiles(initialFiles);
 
-    // Provide some mock AI suggestions
+    // Basic suggestions
     const suggestions = [
-      'Consider implementing a yield farming strategy with multiple tokens.',
-      'Utilize a time-based lockup period for staked tokens.',
-      'Add a governance module to allow community-driven fee adjustments.'
+      "Implement a governance-based function to adjust penaltyFee.",
+      "Extend reward logic to multiple distribution schedules.",
+      "Consider Oracle integration for dynamic reward rates."
     ];
     setAiSuggestions(suggestions);
   };
 
   /* ------------------------------------------------------------------
-     FUNCTION: handleSend
-       - Handles the user pressing "Send" in the chat
-       - Creates a user message and an AI response with code blocks
+     handleSendMessage: Submits a user chat to the currently selected agent
   --------------------------------------------------------------------*/
-  const handleSend = (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    // User message
-    const newMessage: Message = {
-      id: messages.length + 1,
+    const agentId = selectedAgentId; // whichever agent we're talking to
+    const oldMessages = agentMessages[agentId] || [];
+
+    // user message
+    const userMsg: Message = {
+      id: oldMessages.length + 1,
       content: input,
       sender: 'user',
+      agentId,
       timestamp: new Date()
     };
 
-    // AI response uses the latest contract snippet and suggestions
-    const aiResponse: Message = {
-      id: messages.length + 2,
-      content: `Here's an updated contract snippet based on your input (Model: ${selectedModel}). Check out the multi-file editor for all files!`,
+    // Mock AI response referencing the chosen model
+    const aiMsg: Message = {
+      id: oldMessages.length + 2,
+      content: `Here's an updated snippet. (Model: ${selectedModel}) Please check the code editor for changes.`,
       sender: 'ai',
-      agentType: selectedAgent,
+      agentId,
       timestamp: new Date(),
       codeBlocks: [generatedContract || '// No generated contract yet'],
-      securityChecks: ['✓ Reentrancy Guard', '✓ Integer Overflow Protection'],
-      aiSuggestions: aiSuggestions.length > 0 ? aiSuggestions : [
-        'Use robust math libraries for safe arithmetic operations.'
-      ]
+      securityChecks: ['✓ Reentrancy Guard', '✓ Integer Overflow Checks'],
+      aiSuggestions: aiSuggestions.length
+        ? aiSuggestions
+        : ["Consider implementing time-locked governance proposals."]
     };
 
-    // Append messages to chat
-    setMessages([...messages, newMessage, aiResponse]);
+    // Store them
+    const newMessages = [...oldMessages, userMsg, aiMsg];
+    setAgentMessages({
+      ...agentMessages,
+      [agentId]: newMessages
+    });
+
+    // Update security checks for the editor's bottom panel
+    setLatestSecurityChecks(aiMsg.securityChecks || []);
+
+    // Clear input
     setInput('');
-
-    // Expand the UI to chat+editor view if not already
-    setIsExpanded(true);
   };
 
   /* ------------------------------------------------------------------
-     FUNCTION: handleConnectWallet
-       - Simulates connecting to a crypto wallet
+     handleDownloadContract: Let user download .sol file
   --------------------------------------------------------------------*/
-  const handleConnectWallet = () => {
-    setIsWalletConnected(true);
-  };
-
-  /* ------------------------------------------------------------------
-     FUNCTION: downloadContract
-       - Lets user download the main .sol file
-  --------------------------------------------------------------------*/
-  const downloadContract = () => {
+  const handleDownloadContract = () => {
     const element = document.createElement('a');
     const file = new Blob([generatedContract], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
-    element.download = 'MyDeFiProtocol.sol';
+    element.download = 'MyAdvancedDeFi.sol';
     document.body.appendChild(element);
     element.click();
   };
 
   /* ------------------------------------------------------------------
-     RESEARCH SECTION
-       - For showing additional analyses like SWOT, PESTEL, etc.
-       - Could be expanded with more dynamic content in the future
+     Render
   --------------------------------------------------------------------*/
-  const [showResearch, setShowResearch] = useState(false);
-
-  const swotAnalysis = {
-    strengths: [
-      "Transparency through smart contracts",
-      "Global reach and 24/7 availability",
-      "High composability with DeFi ecosystem"
-    ],
-    weaknesses: [
-      "Smart contract security risks",
-      "Volatile crypto market conditions",
-      "Complex UX for non-crypto users"
-    ],
-    opportunities: [
-      "Regulatory clarity could boost adoption",
-      "Partnerships with existing DeFi protocols",
-      "Growing institutional interest in yield strategies"
-    ],
-    threats: [
-      "Harsh regulations or outright bans",
-      "Smart contract exploits/hacks",
-      "Market saturation and competition"
-    ]
-  };
-
-  const pestelAnalysis = {
-    political: "Regulations on DeFi vary widely. Potential for increased scrutiny.",
-    economic: "Crypto markets are highly volatile, influencing user engagement.",
-    social: "Growing acceptance of decentralized finance among younger demographics.",
-    technological: "Advances in Layer-2 solutions reduce fees and increase scalability.",
-    environmental: "Energy consumption remains a concern, though many blockchains are moving to PoS.",
-    legal: "KYC/AML compliance might become necessary for yield protocols."
-  };
+  // Current agent's chat
+  const currentAgentChats = agentMessages[selectedAgentId] || [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* ----------------------------------------------------------------
-          PAGE HEADER: Wallet Connection & Branding
-      ----------------------------------------------------------------- */}
-      <div className="fixed top-0 right-0 p-6 flex items-center gap-4">
-        {/* Connect Wallet Button */}
-        <button
-          onClick={handleConnectWallet}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-            isWalletConnected 
-              ? 'bg-green-100 text-green-700'
-              : 'bg-blue-100 text-blue-700'
-          }`}
-        >
-          <Wallet className="w-5 h-5" />
-          {isWalletConnected ? 'Connected' : 'Connect Wallet'}
-        </button>
+    <div className="min-h-screen flex bg-gray-100">
 
-        {/* Branding */}
-        <div className="flex items-center gap-2">
-          <Blocks className="w-8 h-8 text-blue-600" />
-          <span className="font-bold text-xl text-blue-600">SmartAI</span>
+      {/* ---------------------
+          COLLAPSIBLE SIDEBAR
+      ----------------------*/}
+      <div
+        className={`${
+          sidebarOpen ? 'w-64' : 'w-16'
+        } bg-white border-r shadow-md flex flex-col transition-all duration-300`}
+      >
+        {/* Sidebar Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          {sidebarOpen ? (
+            <div className="flex items-center gap-2">
+              <Blocks className="w-6 h-6 text-blue-600" />
+              <span className="font-bold text-xl text-blue-600">SmartAI</span>
+            </div>
+          ) : (
+            <Blocks className="w-6 h-6 text-blue-600" />
+          )}
+          {/* Toggle Button */}
+          <button onClick={() => setSidebarOpen(!sidebarOpen)}>
+            {sidebarOpen ? (
+              <XCircle className="w-5 h-5 text-gray-500" />
+            ) : (
+              <Menu className="w-5 h-5 text-gray-500" />
+            )}
+          </button>
+        </div>
+
+        {/* Wallet Connect (Top) */}
+        <div className="p-4 flex items-center">
+          <button
+            onClick={handleConnectWallet}
+            className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm ${
+              isWalletConnected 
+                ? 'bg-green-100 text-green-700'
+                : 'bg-blue-100 text-blue-700'
+            }`}
+          >
+            <Wallet className="w-4 h-4" />
+            {sidebarOpen && (isWalletConnected ? 'Connected' : 'Connect')}
+          </button>
+        </div>
+
+        {/* Project Types */}
+        <div className="px-4">
+          {sidebarOpen && <h3 className="text-sm font-semibold mb-2">Projects</h3>}
+          <div className="space-y-2 mb-4">
+            {projectTypes.map(type => (
+              <button
+                key={type.id}
+                onClick={() => {
+                  setSelectedProject(type.id);
+                  generateContract(requirements);
+                  setShowResearchView(false); // reset research view if project changes
+                }}
+                className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left ${
+                  selectedProject === type.id
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="w-5 h-5 text-blue-600">{type.icon}</div>
+                {sidebarOpen && (
+                  <span className="text-sm">{type.name}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Agents */}
+          {sidebarOpen && <h3 className="text-sm font-semibold mb-2">Agents</h3>}
+          <div className="space-y-2 mb-4">
+            {agents.map(agent => (
+              <button
+                key={agent.id}
+                onClick={() => {
+                  setSelectedAgentId(agent.id);
+                  setShowResearchView(false);
+                }}
+                className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left ${
+                  selectedAgentId === agent.id
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="w-5 h-5 text-blue-600">{agent.icon}</div>
+                {sidebarOpen && (
+                  <span className="text-sm">{agent.name}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Chat Model */}
+          {sidebarOpen && <h3 className="text-sm font-semibold mb-2">Chat Model</h3>}
+          <div className="space-y-2 mb-4">
+            {chatModels.map(model => (
+              <button
+                key={model.id}
+                onClick={() => {
+                  setSelectedModel(model.id);
+                }}
+                className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left ${
+                  selectedModel === model.id
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="w-5 h-5 text-gray-600">
+                  <Terminal />
+                </div>
+                {sidebarOpen && (
+                  <span className="text-sm">{model.name}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom Buttons */}
+        <div className="mt-auto p-4 flex flex-col gap-2">
+          {/* Toggle research button */}
+          <button
+            onClick={() => setShowResearchView(!showResearchView)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-gray-50"
+          >
+            <FileCode className="w-4 h-4 text-gray-600" />
+            {sidebarOpen && <span className="text-sm">Research</span>}
+          </button>
+
+          {/* Placeholder settings */}
+          <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-gray-50">
+            <Settings className="w-4 h-4 text-gray-600" />
+            {sidebarOpen && <span className="text-sm">Settings</span>}
+          </button>
         </div>
       </div>
 
-      {/* ----------------------------------------------------------------
-          MAIN CONTENT
-            - If not expanded, show initial config (project, agent, model, requirements)
-            - If expanded, show chat + editor
-      ----------------------------------------------------------------- */}
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        {!isExpanded ? (
-          /* -------------------------------------------------------------
-             INITIAL CONFIGURATION VIEW
-             - Project type, AI agent selection, chat model selection,
-               contract requirements input
-          --------------------------------------------------------------*/
-          <div className="w-full max-w-3xl text-center space-y-8">
-            <h1 className="text-4xl font-bold text-gray-800">Smart Contract Assistant</h1>
+      {/* ---------------------
+          MAIN VIEW
+      ----------------------*/}
+      <div className="flex-1 flex flex-col">
+        {/* If showResearchView is true, display the research panel. Otherwise, show chat. */}
+        {showResearchView ? (
+          <div className="flex-1 p-8 overflow-y-auto">
+            <h1 className="text-3xl font-bold mb-4">Research for Project: {selectedProject.toUpperCase()}</h1>
+            <p className="mb-6 text-gray-700">
+              {/* You can dynamically load or generate research data here. For now, just a placeholder. */}
+              This is where in-depth market or technical research would appear, relevant to the current project type. 
+              For a DeFi Protocol, you might display competitor analysis, yield strategies, or tokenomics references.
+            </p>
+            <div className="space-y-4 text-gray-700 text-sm leading-relaxed">
+              <h2 className="font-semibold">SWOT Analysis (Example)</h2>
+              <ul className="list-disc list-inside">
+                <li><strong>Strengths:</strong> High composability, global liquidity, permissionless usage.</li>
+                <li><strong>Weaknesses:</strong> Smart contract exploits, volatility, complex UI for newcomers.</li>
+                <li><strong>Opportunities:</strong> Growing DeFi adoption, potential to partner with stablecoin providers.</li>
+                <li><strong>Threats:</strong> Regulatory clampdowns, black swan market events, high competition.</li>
+              </ul>
 
-            {/* Project Type Selection */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              {projectTypes.map(type => (
-                <button
-                  key={type.id}
-                  onClick={() => setSelectedProject(type.id)}
-                  className={`p-6 rounded-xl border-2 transition-all ${
-                    selectedProject === type.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-200'
+              <h2 className="font-semibold">PESTEL Analysis (Example)</h2>
+              <ul className="list-disc list-inside">
+                <li><strong>Political:</strong> Varying regulations on DeFi worldwide.</li>
+                <li><strong>Economic:</strong> Market downturns can reduce user appetite for staking.</li>
+                <li><strong>Social:</strong> Younger demographics leaning more into crypto investments.</li>
+                <li><strong>Technological:</strong> Layer-2 solutions improving scalability.</li>
+                <li><strong>Environmental:</strong> PoS transitions helping reduce energy usage.</li>
+                <li><strong>Legal:</strong> KYC/AML issues for large pools or institutional adoption.</li>
+              </ul>
+            </div>
+          </div>
+        ) : (
+          /* Chat with the selected agent */
+          <div className="flex-1 flex flex-col">
+            {/* Requirements input bar (optional) */}
+            <div className="p-4 bg-white border-b flex items-center gap-2">
+              <input
+                type="text"
+                value={currentRequirement}
+                onChange={(e) => setCurrentRequirement(e.target.value)}
+                placeholder="Add new requirement (e.g., 'Time-lock feature for staked tokens')"
+                className="flex-1 p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleAddRequirement}
+                className="bg-blue-500 text-white p-3 rounded-xl hover:bg-blue-600 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Chat area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {currentAgentChats.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex items-start gap-3 ${
+                    message.sender === 'user' ? 'flex-row-reverse' : ''
                   }`}
                 >
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                      {type.icon}
-                    </div>
-                    <h3 className="font-semibold">{type.name}</h3>
-                    <p className="text-sm text-gray-600">{type.description}</p>
+                  {/* Icon */}
+                  <div
+                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                      message.sender === 'user' ? 'bg-blue-100' : 'bg-gray-100'
+                    }`}
+                  >
+                    {message.sender === 'user' ? (
+                      <Zap className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      <Bot className="w-4 h-4 text-gray-600" />
+                    )}
                   </div>
-                </button>
+
+                  {/* Message content */}
+                  <div
+                    className={`p-3 rounded-xl max-w-[75%] ${
+                      message.sender === 'user'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    <p className="text-sm">{message.content}</p>
+
+                    {/* Code snippet(s) */}
+                    {message.codeBlocks?.length ? (
+                      <pre className="mt-2 bg-gray-800 text-green-200 p-2 rounded-md text-xs overflow-x-auto">
+                        {message.codeBlocks.join("\n")}
+                      </pre>
+                    ) : null}
+
+                    {/* AI suggestions */}
+                    {message.aiSuggestions?.length ? (
+                      <ul className="mt-2 text-xs text-yellow-800 list-disc list-inside">
+                        {message.aiSuggestions.map((sug, idx) => (
+                          <li key={idx}>{sug}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                </div>
               ))}
             </div>
 
-            {/* AI Agent Selection */}
-            <div className="relative mb-4">
-              <button
-                onClick={() => setShowAgentSelect(!showAgentSelect)}
-                className="w-full p-4 rounded-xl border-2 border-gray-200 flex items-center justify-between hover:border-blue-200"
-              >
-                <span className="text-gray-700">
-                  {selectedAgent ? agents.find(a => a.id === selectedAgent)?.name : 'Select AI Agent'}
-                </span>
-                <ChevronDown className="w-5 h-5 text-gray-500" />
-              </button>
-              {showAgentSelect && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 z-10">
-                  {agents.map(agent => (
-                    <button
-                      key={agent.id}
-                      onClick={() => {
-                        setSelectedAgent(agent.id);
-                        setShowAgentSelect(false);
-                      }}
-                      className="w-full p-4 flex items-center gap-3 hover:bg-gray-50 first:rounded-t-xl last:rounded-b-xl"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                        {agent.icon}
-                      </div>
-                      <div className="text-left">
-                        <h4 className="font-medium">{agent.name}</h4>
-                        <p className="text-sm text-gray-600">{agent.description}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Chat Model Selection */}
-            <div className="relative mb-4">
-              <button
-                onClick={() => setShowModelSelect(!showModelSelect)}
-                className="w-full p-4 rounded-xl border-2 border-gray-200 flex items-center justify-between hover:border-blue-200"
-              >
-                <span className="text-gray-700">
-                  {selectedModel
-                    ? chatModels.find(model => model.id === selectedModel)?.name 
-                    : 'Select Chat Model'}
-                </span>
-                <ChevronDown className="w-5 h-5 text-gray-500" />
-              </button>
-              {showModelSelect && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 z-10">
-                  {chatModels.map(model => (
-                    <button
-                      key={model.id}
-                      onClick={() => {
-                        setSelectedModel(model.id);
-                        setShowModelSelect(false);
-                      }}
-                      className="w-full p-4 flex flex-col gap-1 hover:bg-gray-50 first:rounded-t-xl last:rounded-b-xl text-left"
-                    >
-                      <span className="font-medium">{model.name}</span>
-                      <span className="text-xs text-gray-500">
-                        {model.description}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Contract Requirements Input */}
-            <div className="bg-white p-6 rounded-2xl shadow-xl space-y-4">
-              <h2 className="text-2xl font-bold text-gray-800">Contract Requirements</h2>
+            {/* Chat input */}
+            <form onSubmit={handleSendMessage} className="p-4 border-t bg-white">
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={currentRequirement}
-                  onChange={(e) => setCurrentRequirement(e.target.value)}
-                  placeholder="Enter a requirement (e.g., 'Implement early withdrawal fee')"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Type your message..."
                   className="flex-1 p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
-                  onClick={addRequirement}
+                  type="submit"
                   className="bg-blue-500 text-white p-3 rounded-xl hover:bg-blue-600 transition-colors"
                 >
-                  <Plus className="w-5 h-5" />
+                  <Send className="w-5 h-5" />
                 </button>
               </div>
-              {requirements.length > 0 && (
-                <ul className="space-y-2 text-left">
-                  {requirements.map((req, index) => (
-                    <li key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-xl">
-                      <span>{req}</span>
-                      <button onClick={() => removeRequirement(index)} className="text-red-500">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <button
-                onClick={() => generateContract()}
-                className="mt-4 bg-green-500 text-white p-3 rounded-xl hover:bg-green-600 transition-colors w-full"
-              >
-                Generate Contract
-              </button>
-            </div>
-
-            {/* Additional Chat Input */}
-            <form onSubmit={handleSend} className="relative">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onFocus={() => setIsExpanded(true)}
-                placeholder="Describe any additional requirements or ask for changes..."
-                className="w-full p-6 rounded-2xl border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all text-lg"
-              />
-              <button
-                type="submit"
-                className="absolute right-4 top-1/2 -translate-y-1/2 bg-blue-500 text-white p-3 rounded-xl hover:bg-blue-600 transition-colors"
-              >
-                <Send className="w-6 h-6" />
-              </button>
             </form>
-
-            {/* Toggle Research Section Button */}
-            <button
-              className="mt-6 text-sm underline text-blue-500"
-              onClick={() => setShowResearch(!showResearch)}
-            >
-              {showResearch ? "Hide" : "View"} Research & Analysis
-            </button>
-
-            {/* Research & Analysis Section */}
-            {showResearch && (
-              <div className="bg-white p-6 rounded-2xl shadow-xl text-left mt-4">
-                <h3 className="text-xl font-bold mb-2">SWOT Analysis</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                  <div>
-                    <h4 className="font-semibold">Strengths</h4>
-                    <ul className="list-disc ml-5">
-                      {swotAnalysis.strengths.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">Weaknesses</h4>
-                    <ul className="list-disc ml-5">
-                      {swotAnalysis.weaknesses.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">Opportunities</h4>
-                    <ul className="list-disc ml-5">
-                      {swotAnalysis.opportunities.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">Threats</h4>
-                    <ul className="list-disc ml-5">
-                      {swotAnalysis.threats.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <h3 className="text-xl font-bold mb-2">PESTEL Analysis</h3>
-                <div className="text-sm space-y-1">
-                  <p><strong>Political:</strong> {pestelAnalysis.political}</p>
-                  <p><strong>Economic:</strong> {pestelAnalysis.economic}</p>
-                  <p><strong>Social:</strong> {pestelAnalysis.social}</p>
-                  <p><strong>Technological:</strong> {pestelAnalysis.technological}</p>
-                  <p><strong>Environmental:</strong> {pestelAnalysis.environmental}</p>
-                  <p><strong>Legal:</strong> {pestelAnalysis.legal}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          /* -------------------------------------------------------------
-             EXPANDED VIEW: SPLIT-SCREEN
-             - Left: Chat Interface
-             - Right: Multi-file Editor
-          --------------------------------------------------------------*/
-          <div className="w-full max-w-7xl grid grid-cols-12 gap-6 mt-20">
-            {/* Left Side - Chat Interface */}
-            <div className="col-span-4 bg-white rounded-2xl shadow-xl h-[800px] flex flex-col">
-              {/* Chat Header */}
-              <div className="p-4 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-800">Chat with {selectedAgent ? agents.find(a => a.id === selectedAgent)?.name : 'AI Agent'} ({selectedModel})</h2>
-              </div>
-
-              {/* Chat Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex items-start gap-3 ${
-                      message.sender === 'user' ? 'flex-row-reverse' : ''
-                    }`}
-                  >
-                    {/* Sender Icon */}
-                    <div
-                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                        message.sender === 'user' ? 'bg-blue-100' : 'bg-gray-100'
-                      }`}
-                    >
-                      {message.sender === 'user' ? (
-                        <Zap className="w-4 h-4 text-blue-600" />
-                      ) : (
-                        <Bot className="w-4 h-4 text-gray-600" />
-                      )}
-                    </div>
-
-                    {/* Message Content */}
-                    <div
-                      className={`p-3 rounded-xl max-w-[80%] ${
-                        message.sender === 'user'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      <p className="text-sm">{message.content}</p>
-
-                      {/* Code Blocks (if any) */}
-                      {message.codeBlocks?.length ? (
-                        <pre className="mt-2 bg-gray-800 text-green-200 p-2 rounded-md text-xs overflow-x-auto">
-                          {message.codeBlocks.join("\n")}
-                        </pre>
-                      ) : null}
-
-                      {/* AI Suggestions (if any) */}
-                      {message.aiSuggestions?.length ? (
-                        <ul className="mt-2 text-xs text-yellow-800 list-disc list-inside">
-                          {message.aiSuggestions.map((suggestion, idx) => (
-                            <li key={idx}>{suggestion}</li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Chat Input Box */}
-              <form onSubmit={handleSend} className="p-4 border-t border-gray-100">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Type your message..."
-                    className="flex-1 p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-blue-500 text-white p-3 rounded-xl hover:bg-blue-600 transition-colors"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Right Side - Multi-file Editor */}
-            <div className="col-span-8 bg-white rounded-2xl shadow-xl h-[800px] flex flex-col">
-              {/* Editor Header */}
-              <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="font-semibold text-gray-800">Code Editor</h2>
-                <div className="flex gap-2">
-                  {/* Download main contract */}
-                  <button
-                    onClick={downloadContract}
-                    className="p-2 rounded-lg hover:bg-gray-100"
-                  >
-                    <Download className="w-5 h-5 text-gray-600" />
-                  </button>
-                  <button className="p-2 rounded-lg hover:bg-gray-100">
-                    <Settings className="w-5 h-5 text-gray-600" />
-                  </button>
-                </div>
-              </div>
-
-              {/* The MultiFileEditor */}
-              <div className="flex-1">
-                {files.length > 0 ? (
-                  <MultiFileEditor files={files} setFiles={setFiles} />
-                ) : (
-                  <div className="p-4 text-gray-600">No files to display.</div>
-                )}
-              </div>
-            </div>
           </div>
         )}
+      </div>
+
+      {/* ---------------------
+          RIGHT PANEL: Editor
+      ----------------------*/}
+      <div className="w-[36rem] bg-white border-l shadow-md flex flex-col">
+        {/* Editor Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="font-semibold text-gray-800">Code Editor</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={handleDownloadContract}
+              className="p-2 rounded-lg hover:bg-gray-100"
+            >
+              <Download className="w-5 h-5 text-gray-600" />
+            </button>
+            <button className="p-2 rounded-lg hover:bg-gray-100">
+              <Settings className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        </div>
+
+        {/* Monaco Editor + Security Panel */}
+        <div className="flex-1">
+          <MultiFileEditor
+            files={files}
+            setFiles={setFiles}
+            latestSecurityChecks={latestSecurityChecks}
+          />
+        </div>
       </div>
     </div>
   );
