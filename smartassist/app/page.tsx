@@ -158,8 +158,8 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   - Research view for the selected project
   - Right side: multi-file editor
 ---------------------------------------------------------------------*/
-function App() {
-  // Collapsible sidebar
+function Home() {
+  const [input, setInput] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Wallet
@@ -249,12 +249,12 @@ function App() {
   // AI suggestions - stored for the latest AI response
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
 
-  /* ------------------------------------------------------------------
+/* ------------------------------------------------------------------
      useEffect: Initialize with an example project (DeFi),
      default agent (research), etc.
   --------------------------------------------------------------------*/
   useEffect(() => {
-    // Initialize requirements for a DeFi project
+// Initialize requirements for a DeFi project
     const defaultReqs = [
       "Users can stake multiple token types for yield",
       "A reward pool is distributed every 7 days",
@@ -268,14 +268,14 @@ function App() {
     generateContract(defaultReqs);
   }, []);
 
-  /* ------------------------------------------------------------------
+/* ------------------------------------------------------------------
      handleConnectWallet: Simulate connecting a user wallet
   --------------------------------------------------------------------*/
   const handleConnectWallet = () => {
     setIsWalletConnected(true);
   };
 
-  /* ------------------------------------------------------------------
+/* ------------------------------------------------------------------
      handleAddRequirement & handleRemoveRequirement
   --------------------------------------------------------------------*/
   const handleAddRequirement = () => {
@@ -292,7 +292,7 @@ function App() {
     generateContract(updated);
   };
 
-  /* ------------------------------------------------------------------
+/* ------------------------------------------------------------------
      generateContract: Create mock contract & populate editor
   --------------------------------------------------------------------*/
   const generateContract = (reqs?: string[]) => {
@@ -375,13 +375,13 @@ contract MyAdvancedDeFi is ReentrancyGuard {
         }
         uint256 finalAmount = amount - fee;
         token.transfer(to, finalAmount);
-        // The fee could remain in the contract or be distributed.
+// The fee could remain in the contract or be distributed.
     }
 }`;
 
     setGeneratedContract(bigDefiContract);
 
-    // Populate the editor with 3 files
+// Populate the editor with 3 files
     const initialFiles: CodeFile[] = [
       { name: "MyAdvancedDeFi.sol", content: bigDefiContract },
       {
@@ -405,7 +405,7 @@ module.exports = {
     ];
     setFiles(initialFiles);
 
-    // Basic suggestions
+// Basic suggestions
     const suggestions = [
       "Implement a governance-based function to adjust penaltyFee.",
       "Extend reward logic to multiple distribution schedules.",
@@ -414,7 +414,7 @@ module.exports = {
     setAiSuggestions(suggestions);
   };
 
-  /* ------------------------------------------------------------------
+/* ------------------------------------------------------------------
      handleSendMessage: Submits a user chat to the currently selected agent
   --------------------------------------------------------------------*/
   const handleSendMessage = (e: React.FormEvent) => {
@@ -424,7 +424,7 @@ module.exports = {
     const agentId = selectedAgentId; // whichever agent we're talking to
     const oldMessages = agentMessages[agentId] || [];
 
-    // user message
+// user message
     const userMsg: Message = {
       id: oldMessages.length + 1,
       content: input,
@@ -433,7 +433,7 @@ module.exports = {
       timestamp: new Date()
     };
 
-    // Mock AI response referencing the chosen model
+// Mock AI response referencing the chosen model
     const aiMsg: Message = {
       id: oldMessages.length + 2,
       content: `Here's an updated snippet. (Model: ${selectedModel}) Please check the code editor for changes.`,
@@ -461,7 +461,7 @@ module.exports = {
     setInput('');
   };
 
-  /* ------------------------------------------------------------------
+/* ------------------------------------------------------------------
      handleDownloadContract: Let user download .sol file
   --------------------------------------------------------------------*/
   const handleDownloadContract = () => {
@@ -473,22 +473,21 @@ module.exports = {
     element.click();
   };
 
-  /* ------------------------------------------------------------------
+/* ------------------------------------------------------------------
      Render
   --------------------------------------------------------------------*/
   // Current agent's chat
   const currentAgentChats = agentMessages[selectedAgentId] || [];
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
-
-      {/* ---------------------
-          COLLAPSIBLE SIDEBAR
-      ----------------------*/}
+    <div className="min-h-screen flex flex-col lg:flex-row bg-gray-100">
+      {/* Sidebar - Collapses on mobile */}
       <div
         className={`${
-          sidebarOpen ? 'w-64' : 'w-16'
-        } bg-white border-r shadow-md flex flex-col transition-all duration-300`}
+          sidebarOpen ? 'w-full lg:w-64' : 'w-16'
+        } bg-white border-r shadow-md flex-shrink-0 flex flex-col transition-all duration-300 ${
+          sidebarOpen ? 'h-screen lg:h-auto fixed lg:relative z-50' : ''
+        }`}
       >
         {/* Sidebar Header */}
         <div className="flex items-center justify-between p-4 border-b">
@@ -510,7 +509,7 @@ module.exports = {
           </button>
         </div>
 
-        {/* Wallet Connect (Top) */}
+        {/* Wallet Connect */}
         <div className="p-4 flex items-center">
           <button
             onClick={handleConnectWallet}
@@ -620,14 +619,13 @@ module.exports = {
         </div>
       </div>
 
-      {/* ---------------------
-          MAIN VIEW
-      ----------------------*/}
-      <div className="flex-1 flex flex-col">
-        {/* If showResearchView is true, display the research panel. Otherwise, show chat. */}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {showResearchView ? (
-          <div className="flex-1 p-8 overflow-y-auto">
-            <h1 className="text-3xl font-bold mb-4">Research for Project: {selectedProject.toUpperCase()}</h1>
+          <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
+            <h1 className="text-2xl lg:text-3xl font-bold mb-4">
+              Research for Project: {selectedProject.toUpperCase()}
+            </h1>
             <p className="mb-6 text-gray-700">
               {/* You can dynamically load or generate research data here. For now, just a placeholder. */}
               This is where in-depth market or technical research would appear, relevant to the current project type. 
@@ -654,35 +652,34 @@ module.exports = {
             </div>
           </div>
         ) : (
-          /* Chat with the selected agent */
-          <div className="flex-1 flex flex-col">
-            {/* Requirements input bar (optional) */}
-            <div className="p-4 bg-white border-b flex items-center gap-2">
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            {/* Requirements input - Full width on mobile */}
+            <div className="p-3 lg:p-4 bg-white border-b flex items-center gap-2">
               <input
                 type="text"
                 value={currentRequirement}
                 onChange={(e) => setCurrentRequirement(e.target.value)}
-                placeholder="Add new requirement (e.g., 'Time-lock feature for staked tokens')"
-                className="flex-1 p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Add requirement..."
+                className="flex-1 p-2 lg:p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm lg:text-base"
               />
               <button
                 onClick={handleAddRequirement}
-                className="bg-blue-500 text-white p-3 rounded-xl hover:bg-blue-600 transition-colors"
+                className="bg-blue-500 text-white p-2 lg:p-3 rounded-xl hover:bg-blue-600 transition-colors flex-shrink-0"
               >
                 <Plus className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Chat area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Chat Messages - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-4">
               {currentAgentChats.map((message) => (
                 <div
                   key={message.id}
                   className={`flex items-start gap-3 ${
                     message.sender === 'user' ? 'flex-row-reverse' : ''
                   }`}
-                >
-                  {/* Icon */}
+                  >
+                    {/* Icon */}
                   <div
                     className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                       message.sender === 'user' ? 'bg-blue-100' : 'bg-gray-100'
@@ -695,15 +692,15 @@ module.exports = {
                     )}
                   </div>
 
-                  {/* Message content */}
+{/* Message content */}
                   <div
-                    className={`p-3 rounded-xl max-w-[75%] ${
+                    className={`p-3 rounded-xl max-w-[85%] lg:max-w-[75%] ${
                       message.sender === 'user'
                         ? 'bg-blue-500 text-white'
                         : 'bg-gray-100 text-gray-800'
                     }`}
                   >
-                    <p className="text-sm">{message.content}</p>
+                    <p className="text-sm lg:text-base">{message.content}</p>
 
                     {/* Code snippet(s) */}
                     {message.codeBlocks?.length ? (
@@ -714,7 +711,7 @@ module.exports = {
 
                     {/* AI suggestions */}
                     {message.aiSuggestions?.length ? (
-                      <ul className="mt-2 text-xs text-yellow-800 list-disc list-inside">
+                      <ul className="mt-2 text-xs lg:text-sm text-yellow-800 list-disc list-inside">
                         {message.aiSuggestions.map((sug, idx) => (
                           <li key={idx}>{sug}</li>
                         ))}
@@ -725,19 +722,19 @@ module.exports = {
               ))}
             </div>
 
-            {/* Chat input */}
-            <form onSubmit={handleSendMessage} className="p-4 border-t bg-white">
+            {/* Chat Input - Fixed at bottom */}
+            <form onSubmit={handleSendMessage} className="p-3 lg:p-4 border-t bg-white">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Type your message..."
-                  className="flex-1 p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 p-2 lg:p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm lg:text-base"
                 />
                 <button
                   type="submit"
-                  className="bg-blue-500 text-white p-3 rounded-xl hover:bg-blue-600 transition-colors"
+                  className="bg-blue-500 text-white p-2 lg:p-3 rounded-xl hover:bg-blue-600 transition-colors flex-shrink-0"
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -747,12 +744,10 @@ module.exports = {
         )}
       </div>
 
-      {/* ---------------------
-          RIGHT PANEL: Editor
-      ----------------------*/}
-      <div className="w-[36rem] bg-white border-l shadow-md flex flex-col">
+      {/* Right Panel - Editor - Collapses to full width on mobile */}
+      <div className="w-full lg:w-[36rem] bg-white border-l shadow-md flex flex-col h-screen">
         {/* Editor Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-3 lg:p-4 border-b">
           <h2 className="font-semibold text-gray-800">Code Editor</h2>
           <div className="flex gap-2">
             <button
@@ -780,4 +775,4 @@ module.exports = {
   );
 }
 
-export default App;
+export default Home;
