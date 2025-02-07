@@ -77,19 +77,16 @@ interface ChatModel {
 /* -------------------------------------------------------------------
   MULTI-FILE EDITOR COMPONENT
   - Tabbed file editor using Monaco
-  - Displays a "Security Checks" panel at the bottom
 ---------------------------------------------------------------------*/
 interface MultiFileEditorProps {
   files: CodeFile[];
   setFiles: React.Dispatch<React.SetStateAction<CodeFile[]>>;
-  latestSecurityChecks: string[];  // Show latest checks for each AI output
-  isFullscreen: boolean;           // Whether the editor is expanded to full-screen
+  isFullscreen: boolean; // Whether the editor is expanded to full-screen
 }
 
 const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   files,
   setFiles,
-  latestSecurityChecks,
   isFullscreen
 }) => {
   // track which file is active
@@ -116,8 +113,8 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
               key={idx}
               onClick={() => setActiveTab(idx)}
               className={`px-4 py-3 flex items-center gap-2 border-r min-w-[150px]
-                ${activeTab === idx 
-                  ? 'bg-white border-b-2 border-b-blue-500 font-medium' 
+                ${activeTab === idx
+                  ? 'bg-white border-b-2 border-b-blue-500 font-medium'
                   : 'hover:bg-gray-100'
                 }`}
             >
@@ -167,37 +164,6 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
           <div className="p-4 text-gray-500">No file selected.</div>
         )}
       </div>
-
-      {/* Security Panel */}
-      <div className="bg-gray-50 border-t">
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-              <Shield className="w-4 h-4 text-green-600" />
-              Security Analysis
-            </h3>
-            <span className="text-xs text-gray-500">Updated: {new Date().toLocaleTimeString()}</span>
-          </div>
-          {latestSecurityChecks.length ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {latestSecurityChecks.map((check, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start gap-2 p-2 bg-white rounded-lg border border-gray-100"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5" />
-                  <span className="text-sm text-gray-700">{check}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-gray-500 text-sm">
-              <Clock className="w-4 h-4" />
-              <span>Waiting for security analysis...</span>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };
@@ -208,7 +174,7 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   - Left: Chat
   - Right: Editor on top, bottom has tabs (Requirements, Research, etc.)
   - Draggable/resizable using SplitPane
----------------------------------------------------------------------*/
+  ---------------------------------------------------------------------*/
 function Home() {
   // State declarations
   const [input, setInput] = useState('');
@@ -318,7 +284,7 @@ function Home() {
   const [currentRequirement, setCurrentRequirement] = useState('');
   const [generatedContract, setGeneratedContract] = useState('');
 
-  // Multi-file editor state
+  // Editor + Security analysis
   const [files, setFiles] = useState<CodeFile[]>([]);
   const [latestSecurityChecks, setLatestSecurityChecks] = useState<string[]>([]);
 
@@ -328,7 +294,7 @@ function Home() {
   // For toggling the Editor's fullscreen
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Bottom Tabs: requirements, research, audit, deploy
+  // Bottom Tabs: requirements, research, audit, deployment
   const bottomTabs = ['requirements', 'research', 'audit', 'deployment'] as const;
   type BottomTab = typeof bottomTabs[number];
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('requirements');
@@ -352,14 +318,14 @@ function Home() {
 
   /* ------------------------------------------------------------------
        handleConnectWallet: Simulate connecting a user wallet
-    --------------------------------------------------------------------*/
+  --------------------------------------------------------------------*/
   const handleConnectWallet = async () => {
     setIsProcessing(true);
     try {
       // Simulated wallet connection
       await new Promise(resolve => setTimeout(resolve, 1000));
       setIsWalletConnected(true);
-      setWalletAddress('0x1234...5678');
+setWalletAddress('0x1234...5678');
     } catch (error) {
       console.error('Wallet connection failed:', error);
     } finally {
@@ -369,7 +335,7 @@ function Home() {
 
   /* ------------------------------------------------------------------
        handleAddRequirement & handleRemoveRequirement
-    --------------------------------------------------------------------*/
+  --------------------------------------------------------------------*/
   const handleAddRequirement = () => {
     if (!currentRequirement.trim()) return;
     const updated = [...requirements, currentRequirement];
@@ -386,7 +352,7 @@ function Home() {
 
   /* ------------------------------------------------------------------
        generateContract: Create mock contract & populate editor
-    --------------------------------------------------------------------*/
+  --------------------------------------------------------------------*/
   const generateContract = (reqs?: string[]) => {
     const finalReqs = reqs || requirements;
     const bigDefiContract = `// SPDX-License-Identifier: MIT
@@ -527,8 +493,8 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
         return 0;
     }
 
-    function _calculateRewards(address user) internal view returns (uint256) {
-        UserInfo memory userInfo = userInfo[user];
+    function _calculateRewards(address _user) internal view returns (uint256) {
+        UserInfo memory userInfo = userInfo[_user];
         uint256 timeElapsed = block.timestamp - userInfo.rewardDebt;
         uint256 totalStaked = userInfo.amountA + userInfo.amountB;
         
@@ -576,6 +542,7 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
     }
 }`;
 
+    // Additional files for the editor
     const readmeContent = `# MyAdvancedDeFi Protocol
 
 ## Overview
@@ -694,7 +661,7 @@ module.exports = {
 
   /* ------------------------------------------------------------------
        handleSendMessage: Submits a user chat to the currently selected agent
-    --------------------------------------------------------------------*/
+  --------------------------------------------------------------------*/
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -754,7 +721,7 @@ module.exports = {
 
   /* ------------------------------------------------------------------
        handleDownloadContract: Let user download .sol file
-    --------------------------------------------------------------------*/
+  --------------------------------------------------------------------*/
   const handleDownloadContract = () => {
     const element = document.createElement('a');
     const file = new Blob([generatedContract], { type: 'text/plain' });
@@ -766,21 +733,21 @@ module.exports = {
 
   /* ------------------------------------------------------------------
        Render
-    --------------------------------------------------------------------*/
+  --------------------------------------------------------------------*/
   const currentAgentChats = agentMessages[selectedAgentId] || [];
   const selectedAgentDetails = agents.find(a => a.id === selectedAgentId);
   const selectedProjectDetails = projectTypes.find(p => p.id === selectedProject);
 
-  // A small style for the SplitPane resizer: thicker line, show pointer on hover
+  // Resizer styles
   const verticalResizerStyle: React.CSSProperties = {
-    width: '5px',
-    background: '#e2e8f0', // Tailwind gray-200
+    width: '8px',
+    background: '#e2e8f0',
     cursor: 'col-resize',
     margin: '0 2px',
     zIndex: 1,
   };
   const horizontalResizerStyle: React.CSSProperties = {
-    height: '5px',
+    height: '4px',
     background: '#e2e8f0',
     cursor: 'row-resize',
     margin: '2px 0',
@@ -789,7 +756,6 @@ module.exports = {
 
   return (
     <div className="min-h-screen flex flex-col">
-
       {/* Top Bar: LLM dropdown + Wallet Connect */}
       <div className="w-full h-14 flex items-center justify-between bg-white border-b px-4">
         <div className="flex items-center gap-3">
@@ -860,7 +826,7 @@ module.exports = {
         style={{ position: 'relative', flex: 1 }}
       >
         {/* LEFT: Chat Panel */}
-        <div className="flex flex-col h-full overflow-y-auto">
+        <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden">
           {/* Agent selection (optional) */}
           <div className="flex gap-2 p-3 border-b bg-gray-50">
             {agents.map(agent => (
@@ -880,7 +846,7 @@ module.exports = {
           </div>
 
           {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4">
             {currentAgentChats.map((message) => (
               <div
                 key={message.id}
@@ -1012,7 +978,7 @@ module.exports = {
           style={{ position: 'relative' }}
         >
           {/* TOP: Editor Panel */}
-          <div className="w-full h-full flex flex-col">
+          <div className="w-full h-full flex flex-col overflow-y-auto overflow-x-hidden">
             <div className="flex items-center justify-between p-4 border-b bg-white">
               <div className="flex items-center gap-3">
                 <FileCode className="w-5 h-5 text-gray-500" />
@@ -1039,14 +1005,13 @@ module.exports = {
               <MultiFileEditor
                 files={files}
                 setFiles={setFiles}
-                latestSecurityChecks={latestSecurityChecks}
                 isFullscreen={isFullscreen}
               />
             </div>
           </div>
 
           {/* BOTTOM: TABS (Requirements, Research, Audit, Deployment) */}
-          <div className="w-full h-full flex flex-col bg-white">
+          <div className="w-full h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden">
             {/* Tab Bar */}
             <div className="flex items-center gap-2 border-b px-4 bg-gray-50">
               {bottomTabs.map(tab => (
@@ -1066,7 +1031,8 @@ module.exports = {
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+              {/* REQUIREMENTS TAB */}
               {activeBottomTab === 'requirements' && (
                 <div>
                   <h2 className="text-lg font-semibold mb-3">Project Requirements</h2>
@@ -1086,27 +1052,30 @@ module.exports = {
                       <Plus className="w-5 h-5" />
                     </button>
                   </div>
+
+                  {/* List each requirement vertically */}
                   {requirements.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <ul className="space-y-3">
                       {requirements.map((req, idx) => (
-                        <div
+                        <li
                           key={idx}
                           className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-sm"
                         >
-                          <span className="text-gray-700">{req}</span>
                           <button
                             onClick={() => handleRemoveRequirement(idx)}
                             className="text-gray-400 hover:text-red-500"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                        </div>
+                          <span className="text-gray-700 flex-1">{req}</span>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
                 </div>
               )}
 
+              {/* RESEARCH TAB */}
               {activeBottomTab === 'research' && (
                 <div className="max-w-4xl">
                   <h2 className="text-lg font-semibold mb-3">
@@ -1236,15 +1205,33 @@ module.exports = {
                 </div>
               )}
 
+              {/* AUDIT TAB (Security Analysis) */}
               {activeBottomTab === 'audit' && (
                 <div>
-                  <h2 className="text-lg font-semibold mb-3">Audit Section</h2>
-                  <p className="text-sm text-gray-600">
-                    (Placeholder) Perform code audits, vulnerability scans, etc.
-                  </p>
+                  <h2 className="text-lg font-semibold mb-3">Audit & Security Analysis</h2>
+                  <p className="text-sm text-gray-500 mb-3">Below are the latest security checks:</p>
+                  {latestSecurityChecks.length ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {latestSecurityChecks.map((check, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2 p-2 bg-white rounded-lg border border-gray-100"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5" />
+                          <span className="text-sm text-gray-700">{check}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-gray-500 text-sm">
+                      <Clock className="w-4 h-4" />
+                      <span>Waiting for security analysis...</span>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* DEPLOYMENT TAB */}
               {activeBottomTab === 'deployment' && (
                 <div>
                   <h2 className="text-lg font-semibold mb-3">Deployment</h2>
