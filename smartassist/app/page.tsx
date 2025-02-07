@@ -20,7 +20,10 @@ import {
   Trash2,
   Download,
   Menu,
-  XCircle
+  XCircle,
+  AlertCircle,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 
 /* -------------------------------------------------------------------
@@ -35,6 +38,7 @@ interface Message {
   codeBlocks?: string[];
   securityChecks?: string[];
   aiSuggestions?: string[];
+  status?: 'pending' | 'complete' | 'error';
 }
 
 interface Agent {
@@ -42,6 +46,7 @@ interface Agent {
   name: string;
   description: string;
   icon: React.ReactNode;
+  expertise: string[];
 }
 
 interface ProjectType {
@@ -49,17 +54,23 @@ interface ProjectType {
   name: string;
   description: string;
   icon: React.ReactNode;
+  features: string[];
+  complexity: 'Low' | 'Medium' | 'High';
 }
 
 interface CodeFile {
   name: string;
   content: string;
+  language: string;
+  lastModified: Date;
 }
 
 interface ChatModel {
   id: string;
   name: string;
   description: string;
+  features: string[];
+  costLevel: 'Low' | 'Medium' | 'High';
 }
 
 /* -------------------------------------------------------------------
@@ -78,30 +89,54 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   setFiles,
   latestSecurityChecks
 }) => {
-  // track which file is active
+// track which file is active
   const [activeTab, setActiveTab] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleEditorChange = (value: string | undefined) => {
     if (!files[activeTab]) return;
     const updated = [...files];
-    updated[activeTab].content = value || "";
+    updated[activeTab] = {
+      ...updated[activeTab],
+      content: value || "",
+      lastModified: new Date()
+    };
     setFiles(updated);
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tabs */}
-      <div className="flex border-b">
-        {files.map((file, idx) => (
+    <div className={`flex flex-col h-full ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
+      {/* Tabs with file info */}
+      <div className="flex items-center border-b bg-gray-50 overflow-x-auto">
+        <div className="flex-1 flex">
+          {files.map((file, idx) => (
+            <button
+              key={idx}
+              onClick={() => setActiveTab(idx)}
+              className={`px-4 py-3 flex items-center gap-2 border-r min-w-[150px]
+                ${activeTab === idx 
+                  ? 'bg-white border-b-2 border-b-blue-500 font-medium' 
+                  : 'hover:bg-gray-100'
+                }`}
+            >
+              <FileCode className="w-4 h-4 text-gray-500" />
+              <div className="flex flex-col items-start">
+                <span className="text-sm truncate max-w-[100px]">{file.name}</span>
+                <span className="text-xs text-gray-500">
+                  {new Date(file.lastModified).toLocaleTimeString()}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="flex-shrink-0 border-l px-2">
           <button
-            key={idx}
-            onClick={() => setActiveTab(idx)}
-            className={`px-4 py-2 border-t border-l border-r 
-              ${activeTab === idx ? "bg-white font-bold" : "bg-gray-200"}`}
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="p-2 hover:bg-gray-100 rounded-lg"
           >
-            {file.name}
+            <Blocks className="w-4 h-4 text-gray-600" />
           </button>
-        ))}
+        </div>
       </div>
 
       {/* Code Editor */}
@@ -109,13 +144,7 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
         {files[activeTab] ? (
           <Editor
             height="100%"
-            language={
-              files[activeTab].name.endsWith('.sol')
-                ? "solidity"
-                : files[activeTab].name.endsWith('.md')
-                ? "markdown"
-                : "javascript"
-            }
+            language={files[activeTab].language}
             theme="vs-dark"
             value={files[activeTab].content}
             onChange={handleEditorChange}
@@ -123,28 +152,48 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
               automaticLayout: true,
               fontSize: 14,
               minimap: { enabled: true },
-              scrollbar: { verticalScrollbarSize: 8 }
+              scrollbar: { verticalScrollbarSize: 8 },
+              lineNumbers: 'on',
+              renderWhitespace: 'selection',
+              bracketPairColorization: { enabled: true },
+              formatOnPaste: true,
+              formatOnType: true
             }}
           />
         ) : (
-          <div className="p-4 text-gray-500">
-            No file selected.
-          </div>
+          <div className="p-4 text-gray-500">No file selected.</div>
         )}
       </div>
 
-      {/* Security Checks Panel */}
-      <div className="bg-gray-100 p-4 border-t text-sm">
-        <h3 className="font-semibold mb-2">Security Checks</h3>
-        {latestSecurityChecks.length ? (
-          <ul className="list-disc list-inside text-gray-700 space-y-1">
-            {latestSecurityChecks.map((check, idx) => (
-              <li key={idx}>{check}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-gray-500">No new checks found.</p>
-        )}
+      {/* Security Panel */}
+      <div className="bg-gray-50 border-t">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-green-600" />
+              Security Analysis
+            </h3>
+            <span className="text-xs text-gray-500">Updated: {new Date().toLocaleTimeString()}</span>
+          </div>
+          {latestSecurityChecks.length ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {latestSecurityChecks.map((check, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2 p-2 bg-white rounded-lg border border-gray-100"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5" />
+                  <span className="text-sm text-gray-700">{check}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-gray-500 text-sm">
+              <Clock className="w-4 h-4" />
+              <span>Waiting for security analysis...</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -159,70 +208,102 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   - Right side: multi-file editor
 ---------------------------------------------------------------------*/
 function Home() {
+  // State declarations
   const [input, setInput] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Wallet
   const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Agents (multiple)
+// Agents (multiple)
   const agents: Agent[] = [
     {
       id: 'research',
       name: 'Research Agent',
       description: 'Provides domain/market research & suggestions',
-      icon: <Brain />
+      icon: <Brain />,
+      expertise: ['Market Analysis', 'Competitor Research', 'Trend Analysis', 'Risk Assessment']
     },
     {
       id: 'developer',
       name: 'Developer Agent',
       description: 'Implements the contract logic',
-      icon: <Terminal />
+      icon: <Terminal />,
+      expertise: ['Smart Contracts', 'Gas Optimization', 'Testing', 'Integration']
     },
     {
       id: 'auditor',
       name: 'Auditor Agent',
       description: 'Analyzes and audits the contract for vulnerabilities',
-      icon: <Shield />
+      icon: <Shield />,
+      expertise: ['Security Analysis', 'Best Practices', 'Vulnerability Detection', 'Code Review']
     },
     {
       id: 'deployment',
       name: 'Deployment Specialist',
       description: 'Handles final deployment & verification steps',
-      icon: <GitBranch />
+      icon: <GitBranch />,
+      expertise: ['Network Selection', 'Contract Verification', 'Gas Estimation', 'Deployment Strategy']
     }
   ];
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('research');
 
-  // Project types
+// Project types
   const projectTypes: ProjectType[] = [
     {
       id: 'defi',
       name: 'DeFi Protocol',
       description: 'Medium-High complexity staking or yield strategies',
-      icon: <Database />
+      icon: <Database />,
+      features: ['Multi-token Support', 'Yield Optimization', 'Flash Loans', 'Governance'],
+      complexity: 'High'
     },
     {
       id: 'nft',
       name: 'NFT Platform',
       description: 'Minting, marketplace, and royalties',
-      icon: <FileCode />
+      icon: <FileCode />,
+      features: ['ERC-721/1155', 'Marketplace', 'Royalties', 'Metadata'],
+      complexity: 'Medium'
     },
     {
       id: 'dao',
       name: 'DAO Framework',
       description: 'Governance tokens, proposals, and voting',
-      icon: <Layout />
+      icon: <Layout />,
+      features: ['Token Voting', 'Proposal System', 'Treasury Management', 'Timelock'],
+      complexity: 'High'
     }
   ];
-  const [selectedProject, setSelectedProject] = useState('defi');
 
-  // Chat Model selection
+// Chat Model selection
   const chatModels: ChatModel[] = [
-    { id: 'gpt-4', name: 'OpenAI GPT-4', description: 'Advanced reasoning model' },
-    { id: 'gpt-3.5', name: 'OpenAI GPT-3.5', description: 'Faster, cost-effective solution' },
-    { id: 'custom-llm', name: 'Custom LLM', description: 'Bring-your-own fine-tuned model' }
+    {
+      id: 'gpt-4',
+      name: 'OpenAI GPT-4',
+      description: 'Advanced reasoning model',
+      features: ['Complex Problem Solving', 'Nuanced Understanding', 'Code Generation'],
+      costLevel: 'High'
+    },
+    {
+      id: 'gpt-3.5',
+      name: 'OpenAI GPT-3.5',
+      description: 'Faster, cost-effective solution',
+      features: ['Quick Responses', 'Basic Code Help', 'Documentation'],
+      costLevel: 'Low'
+    },
+    {
+      id: 'custom-llm',
+      name: 'Custom LLM',
+      description: 'Bring-your-own fine-tuned model',
+      features: ['Specialized Knowledge', 'Custom Training', 'Private Deployment'],
+      costLevel: 'Medium'
+    }
   ];
+
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('research');
+  const [selectedProject, setSelectedProject] = useState('defi');
   const [selectedModel, setSelectedModel] = useState('gpt-4');
 
   // Research view toggle
@@ -271,14 +352,24 @@ function Home() {
 /* ------------------------------------------------------------------
      handleConnectWallet: Simulate connecting a user wallet
   --------------------------------------------------------------------*/
-  const handleConnectWallet = () => {
-    setIsWalletConnected(true);
+  const handleConnectWallet = async () => {
+    setIsProcessing(true);
+    try {
+      // Simulated wallet connection
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsWalletConnected(true);
+      setWalletAddress('0x1234...5678');
+    } catch (error) {
+      console.error('Wallet connection failed:', error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-/* ------------------------------------------------------------------
-     handleAddRequirement & handleRemoveRequirement
-  --------------------------------------------------------------------*/
-  const handleAddRequirement = () => {
+  /* ------------------------------------------------------------------
+       handleAddRequirement & handleRemoveRequirement
+    --------------------------------------------------------------------*/
+    const handleAddRequirement = () => {
     if (!currentRequirement.trim()) return;
     const updated = [...requirements, currentRequirement];
     setRequirements(updated);
@@ -297,131 +388,321 @@ function Home() {
   --------------------------------------------------------------------*/
   const generateContract = (reqs?: string[]) => {
     const finalReqs = reqs || requirements;
-    const bigDefiContract = `// DeFi Protocol Contract (Advanced Example)
-// Requirements:
-${finalReqs.map((r, i) => `// ${i + 1}. ${r}`).join('\n')}
-
+    const bigDefiContract = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
-// Example advanced contract with multiple tokens & governance
-contract MyAdvancedDeFi is ReentrancyGuard {
+/**
+ * @title MyAdvancedDeFi
+ * @dev Advanced DeFi protocol with multi-token staking and governance
+ * Requirements:
+${finalReqs.map((r, i) => ` * ${i + 1}. ${r}`).join('\n')}
+ */
+contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
     IERC20 public stakeTokenA;
     IERC20 public stakeTokenB;
-    address public governanceToken; // For voting/fee adjustments
+    IERC20 public governanceToken;
     
     struct UserInfo {
-        uint256 amountA;    // Staked amount of Token A
-        uint256 amountB;    // Staked amount of Token B
+        uint256 amountA;
+        uint256 amountB;
         uint256 lastStakeTime;
+        uint256 rewardDebt;
     }
 
     mapping(address => UserInfo) public userInfo;
     uint256 public rewardPool;
     uint256 public penaltyPeriod = 7 days;
-    uint256 public penaltyFee = 10; // 10%
+    uint256 public penaltyFee = 10;
+    uint256 public constant PRECISION = 1e18;
     
-    constructor(address _tokenA, address _tokenB, uint256 _initialRewards) {
+    event Staked(address indexed user, address token, uint256 amount);
+    event Withdrawn(address indexed user, address token, uint256 amount, uint256 penalty);
+    event RewardsClaimed(address indexed user, uint256 amount);
+    event PenaltyUpdated(uint256 oldFee, uint256 newFee);
+    
+    constructor(
+        address _tokenA,
+        address _tokenB,
+        address _govToken,
+        uint256 _initialRewards
+    ) {
+        require(_tokenA != address(0), "Invalid token A address");
+        require(_tokenB != address(0), "Invalid token B address");
+        require(_govToken != address(0), "Invalid governance token address");
+        
         stakeTokenA = IERC20(_tokenA);
         stakeTokenB = IERC20(_tokenB);
+        governanceToken = IERC20(_govToken);
         rewardPool = _initialRewards;
     }
 
-    function stake(address token, uint256 amount) external nonReentrant {
-        require(amount > 0, "Cannot stake zero tokens.");
+    modifier validateToken(address token) {
+        require(
+            token == address(stakeTokenA) || token == address(stakeTokenB),
+            "Unsupported token"
+        );
+        _;
+    }
+
+    function stake(address token, uint256 amount) 
+        external 
+        nonReentrant 
+        validateToken(token)
+        whenNotPaused 
+    {
+        require(amount > 0, "Cannot stake zero tokens");
         UserInfo storage user = userInfo[msg.sender];
 
         if (token == address(stakeTokenA)) {
             stakeTokenA.transferFrom(msg.sender, address(this), amount);
             user.amountA += amount;
-        } else if (token == address(stakeTokenB)) {
+        } else {
             stakeTokenB.transferFrom(msg.sender, address(this), amount);
             user.amountB += amount;
-        } else {
-            revert("Unsupported staking token");
         }
 
         user.lastStakeTime = block.timestamp;
+        emit Staked(msg.sender, token, amount);
     }
 
-    function withdraw(address token, uint256 amount) external nonReentrant {
+    function withdraw(address token, uint256 amount) 
+        external 
+        nonReentrant 
+        validateToken(token)
+        whenNotPaused 
+    {
         UserInfo storage user = userInfo[msg.sender];
+        require(
+            token == address(stakeTokenA) ? amount <= user.amountA : amount <= user.amountB,
+            "Insufficient balance"
+        );
+
         if (token == address(stakeTokenA)) {
-            require(amount <= user.amountA, "Not enough staked token A.");
             user.amountA -= amount;
-            _applyPenaltyAndTransfer(stakeTokenA, msg.sender, amount);
-        } else if (token == address(stakeTokenB)) {
-            require(amount <= user.amountB, "Not enough staked token B.");
-            user.amountB -= amount;
-            _applyPenaltyAndTransfer(stakeTokenB, msg.sender, amount);
         } else {
-            revert("Unsupported token withdrawal");
+            user.amountB -= amount;
         }
+
+        uint256 penalty = _calculatePenalty(user, amount);
+        uint256 finalAmount = amount - penalty;
+        
+        IERC20(token).transfer(msg.sender, finalAmount);
+        if (penalty > 0) {
+            IERC20(token).transfer(address(this), penalty);
+        }
+        
+        emit Withdrawn(msg.sender, token, amount, penalty);
     }
 
-    function claimRewards() external nonReentrant {
-        // Implementation example:
-        // - Calculate user share
-        // - Transfer from rewardPool
+    function claimRewards() external nonReentrant whenNotPaused {
+        UserInfo storage user = userInfo[msg.sender];
+        uint256 pending = _calculateRewards(msg.sender);
+        require(pending > 0, "No rewards to claim");
+        
+        user.rewardDebt = block.timestamp;
+        rewardPool -= pending;
+        
+        require(
+            governanceToken.transfer(msg.sender, pending),
+            "Reward transfer failed"
+        );
+        
+        emit RewardsClaimed(msg.sender, pending);
     }
 
-    function _applyPenaltyAndTransfer(IERC20 token, address to, uint256 amount) internal {
-        UserInfo storage user = userInfo[to];
-        uint256 fee = 0;
+    function _calculatePenalty(UserInfo memory user, uint256 amount) 
+        internal 
+        view 
+        returns (uint256) 
+    {
         if (block.timestamp < user.lastStakeTime + penaltyPeriod) {
-            fee = (amount * penaltyFee) / 100;
+            return (amount * penaltyFee) / 100;
         }
-        uint256 finalAmount = amount - fee;
-        token.transfer(to, finalAmount);
-// The fee could remain in the contract or be distributed.
+        return 0;
+    }
+
+    function _calculateRewards(address user) internal view returns (uint256) {
+        UserInfo memory userInfo = userInfo[user];
+        uint256 timeElapsed = block.timestamp - userInfo.rewardDebt;
+        uint256 totalStaked = userInfo.amountA + userInfo.amountB;
+        
+        if (timeElapsed == 0 || totalStaked == 0) return 0;
+        
+        return (totalStaked * timeElapsed * PRECISION) / (7 days);
+    }
+
+    // Governance functions
+    function updatePenaltyFee(uint256 newFee) external {
+        require(
+            governanceToken.balanceOf(msg.sender) >= 1000 * PRECISION,
+            "Insufficient governance tokens"
+        );
+        require(newFee <= 20, "Fee too high");
+        
+        emit PenaltyUpdated(penaltyFee, newFee);
+        penaltyFee = newFee;
+    }
+
+    // Emergency functions
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function emergencyWithdraw(address token) external nonReentrant {
+        require(paused(), "Protocol must be paused");
+        UserInfo storage user = userInfo[msg.sender];
+        
+        uint256 amount = token == address(stakeTokenA) ? user.amountA : user.amountB;
+        require(amount > 0, "No tokens to withdraw");
+        
+        if (token == address(stakeTokenA)) {
+            user.amountA = 0;
+        } else {
+            user.amountB = 0;
+        }
+        
+        IERC20(token).transfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, token, amount, 0);
     }
 }`;
+
+    const readmeContent = `# MyAdvancedDeFi Protocol
+
+## Overview
+This is a production-ready DeFi protocol implementing:
+${finalReqs.map(r => `- ${r}`).join('\n')}
+
+## Features
+- Multi-token staking support
+- Time-based rewards distribution
+- Early withdrawal penalties
+- Governance integration
+- Emergency withdrawal mechanism
+- Comprehensive security measures
+
+## Security Features
+- ReentrancyGuard for all state-changing functions
+- Pausable for emergency situations
+- Precise mathematical calculations
+- Event emission for transparency
+- Input validation and bounds checking
+
+## Deployment
+1. Deploy governance token
+2. Deploy staking tokens (if new)
+3. Deploy main contract with:
+   - Token A address
+   - Token B address
+   - Governance token address
+   - Initial rewards amount
+
+## Testing
+Run full test suite before deployment:
+\`\`\`bash
+npx hardhat test
+npx hardhat coverage
+\`\`\`
+
+## Audit Status
+Pending security audit. Key areas to review:
+- Reward calculation precision
+- Withdrawal penalty logic
+- Governance token integration
+- Emergency procedures`;
+
+    const deployConfig = `// Deployment Configuration
+module.exports = {
+  // Network selection
+  network: "goerli",
+  
+  // Contract addresses
+  tokenA: "0xTokenA...",  // Staking token A
+  tokenB: "0xTokenB...",  // Staking token B
+  govToken: "0xGov...",   // Governance token
+  
+  // Initial parameters
+  initialRewards: "1000000000000000000000", // 1,000 tokens (18 decimals)
+  
+  // Verification settings
+  verify: true,
+  
+  // Constructor arguments
+  constructorArgs: [
+    "0xTokenA...",
+    "0xTokenB...",
+    "0xGov...",
+    "1000000000000000000000"
+  ],
+  
+  // Gas settings
+  gasPrice: "auto",
+  gasLimit: 5000000
+};`;
 
     setGeneratedContract(bigDefiContract);
 
 // Populate the editor with 3 files
     const initialFiles: CodeFile[] = [
-      { name: "MyAdvancedDeFi.sol", content: bigDefiContract },
+      {
+        name: "MyAdvancedDeFi.sol",
+        content: bigDefiContract,
+        language: "solidity",
+        lastModified: new Date()
+      },
       {
         name: "README.md",
-        content: `# MyAdvancedDeFi
-This contract was generated for a more advanced DeFi scenario:
-- ${finalReqs.join("\n- ")}
-      
-Includes multi-token staking, a penalty period, partial governance integration.`
+        content: readmeContent,
+        language: "markdown",
+        lastModified: new Date()
       },
       {
         name: "deploy-config.js",
-        content: `// Example deployment config
-module.exports = {
-  network: "goerli",
-  tokenA: "0xTokenA...",
-  tokenB: "0xTokenB...",
-  initialRewards: "1000000000000000000000" // 1,000 tokens worth in Wei
-};`
+        content: deployConfig,
+        language: "javascript",
+        lastModified: new Date()
       }
     ];
     setFiles(initialFiles);
 
 // Basic suggestions
     const suggestions = [
-      "Implement a governance-based function to adjust penaltyFee.",
-      "Extend reward logic to multiple distribution schedules.",
-      "Consider Oracle integration for dynamic reward rates."
+      "Implement time-weighted rewards based on stake duration",
+      "Add support for flash loan protection",
+      "Consider implementing a progressive penalty system",
+      "Add emergency pause mechanism with timelock",
+      "Integrate with Chainlink price feeds for dynamic rewards"
     ];
     setAiSuggestions(suggestions);
+
+    setLatestSecurityChecks([
+      "✓ ReentrancyGuard implemented on state-changing functions",
+      "✓ Proper access control with Ownable",
+      "✓ Emergency pause functionality",
+      "✓ Input validation on constructor",
+      "✓ Safe math operations",
+      "✓ Event emission for transparency",
+      "✓ Bounds checking on penalty fee"
+    ]);
   };
 
-/* ------------------------------------------------------------------
-     handleSendMessage: Submits a user chat to the currently selected agent
-  --------------------------------------------------------------------*/
-  const handleSendMessage = (e: React.FormEvent) => {
+  /* ------------------------------------------------------------------
+       handleSendMessage: Submits a user chat to the currently selected agent
+    --------------------------------------------------------------------*/
+    const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const agentId = selectedAgentId; // whichever agent we're talking to
+    setIsProcessing(true);
+    const agentId = selectedAgentId;
     const oldMessages = agentMessages[agentId] || [];
 
 // user message
@@ -430,35 +711,47 @@ module.exports = {
       content: input,
       sender: 'user',
       agentId,
-      timestamp: new Date()
+      timestamp: new Date(),
+      status: 'complete'
     };
 
 // Mock AI response referencing the chosen model
-    const aiMsg: Message = {
+    const processingMsg: Message = {
       id: oldMessages.length + 2,
-      content: `Here's an updated snippet. (Model: ${selectedModel}) Please check the code editor for changes.`,
+      content: 'Analyzing your request...',
       sender: 'ai',
       agentId,
       timestamp: new Date(),
-      codeBlocks: [generatedContract || '// No generated contract yet'],
-      securityChecks: ['✓ Reentrancy Guard', '✓ Integer Overflow Checks'],
-      aiSuggestions: aiSuggestions.length
-        ? aiSuggestions
-        : ["Consider implementing time-locked governance proposals."]
+      status: 'pending'
     };
 
-    // Store them
-    const newMessages = [...oldMessages, userMsg, aiMsg];
     setAgentMessages({
       ...agentMessages,
-      [agentId]: newMessages
+      [agentId]: [...oldMessages, userMsg, processingMsg]
     });
 
-    // Update security checks for the editor's bottom panel
-    setLatestSecurityChecks(aiMsg.securityChecks || []);
+    // Simulate AI response delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Clear input
+    const aiMsg: Message = {
+      id: oldMessages.length + 2,
+      content: `Here's an updated implementation based on your request. (Using ${selectedModel})`,
+      sender: 'ai',
+      agentId,
+      timestamp: new Date(),
+      codeBlocks: [generatedContract],
+      securityChecks: latestSecurityChecks,
+      aiSuggestions: aiSuggestions,
+      status: 'complete'
+    };
+
+    setAgentMessages({
+      ...agentMessages,
+      [agentId]: [...oldMessages, userMsg, aiMsg]
+    });
+
     setInput('');
+    setIsProcessing(false);
   };
 
 /* ------------------------------------------------------------------
@@ -478,10 +771,12 @@ module.exports = {
   --------------------------------------------------------------------*/
   // Current agent's chat
   const currentAgentChats = agentMessages[selectedAgentId] || [];
+  const selectedAgentDetails = agents.find(a => a.id === selectedAgentId);
+  const selectedProjectDetails = projectTypes.find(p => p.id === selectedProject);
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-gray-100">
-      {/* Sidebar - Collapses on mobile */}
+      {/* Sidebar */}
       <div
         className={`${
           sidebarOpen ? 'w-full lg:w-64' : 'w-16'
@@ -500,7 +795,10 @@ module.exports = {
             <Blocks className="w-6 h-6 text-blue-600" />
           )}
           {/* Toggle Button */}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+          >
             {sidebarOpen ? (
               <XCircle className="w-5 h-5 text-gray-500" />
             ) : (
@@ -509,50 +807,83 @@ module.exports = {
           </button>
         </div>
 
-        {/* Wallet Connect */}
-        <div className="p-4 flex items-center">
+        {/* Wallet Section */}
+        <div className="p-4 border-b">
           <button
             onClick={handleConnectWallet}
-            className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm ${
+            disabled={isProcessing}
+            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               isWalletConnected 
-                ? 'bg-green-100 text-green-700'
-                : 'bg-blue-100 text-blue-700'
-            }`}
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+            } ${isProcessing ? 'opacity-75 cursor-not-allowed' : ''}`}
           >
             <Wallet className="w-4 h-4" />
-            {sidebarOpen && (isWalletConnected ? 'Connected' : 'Connect')}
+            {sidebarOpen && (
+              <span>
+                {isProcessing 
+                  ? 'Connecting...' 
+                  : isWalletConnected 
+                    ? walletAddress 
+                    : 'Connect Wallet'
+                }
+              </span>
+            )}
           </button>
         </div>
 
         {/* Project Types */}
-        <div className="px-4">
-          {sidebarOpen && <h3 className="text-sm font-semibold mb-2">Projects</h3>}
-          <div className="space-y-2 mb-4">
+        <div className="px-4 py-3 border-b">
+          {sidebarOpen && (
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Projects
+            </h3>
+          )}
+          <div className="space-y-1">
             {projectTypes.map(type => (
               <button
                 key={type.id}
                 onClick={() => {
                   setSelectedProject(type.id);
                   generateContract(requirements);
-                  setShowResearchView(false); // reset research view if project changes
+                  setShowResearchView(false);
                 }}
-                className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left ${
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors ${
                   selectedProject === type.id
-                    ? 'bg-blue-50 border border-blue-200'
-                    : 'hover:bg-gray-50'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <div className="w-5 h-5 text-blue-600">{type.icon}</div>
+                <div className="w-5 h-5">{type.icon}</div>
                 {sidebarOpen && (
-                  <span className="text-sm">{type.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{type.name}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        type.complexity === 'High' 
+                          ? 'bg-red-100 text-red-700'
+                          : type.complexity === 'Medium'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-green-100 text-green-700'
+                      }`}>
+                        {type.complexity}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Agents */}
-          {sidebarOpen && <h3 className="text-sm font-semibold mb-2">Agents</h3>}
-          <div className="space-y-2 mb-4">
+        {/* Agents */}
+        <div className="px-4 py-3 border-b">
+          {sidebarOpen && (
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              AI Agents
+            </h3>
+          )}
+          <div className="space-y-1">
             {agents.map(agent => (
               <button
                 key={agent.id}
@@ -560,40 +891,63 @@ module.exports = {
                   setSelectedAgentId(agent.id);
                   setShowResearchView(false);
                 }}
-                className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left ${
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors ${
                   selectedAgentId === agent.id
-                    ? 'bg-blue-50 border border-blue-200'
-                    : 'hover:bg-gray-50'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <div className="w-5 h-5 text-blue-600">{agent.icon}</div>
+                <div className="w-5 h-5">{agent.icon}</div>
                 {sidebarOpen && (
-                  <span className="text-sm">{agent.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium block">{agent.name}</span>
+                    <span className="text-xs text-gray-500 truncate block">
+                      {agent.expertise.join(' • ')}
+                    </span>
+                  </div>
                 )}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Chat Model */}
-          {sidebarOpen && <h3 className="text-sm font-semibold mb-2">Chat Model</h3>}
-          <div className="space-y-2 mb-4">
+        {/* Chat Models */}
+        <div className="px-4 py-3 border-b">
+          {sidebarOpen && (
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Models
+            </h3>
+          )}
+          <div className="space-y-1">
             {chatModels.map(model => (
               <button
                 key={model.id}
-                onClick={() => {
-                  setSelectedModel(model.id);
-                }}
-                className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left ${
+                onClick={() => setSelectedModel(model.id)}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors ${
                   selectedModel === model.id
-                    ? 'bg-blue-50 border border-blue-200'
-                    : 'hover:bg-gray-50'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <div className="w-5 h-5 text-gray-600">
-                  <Terminal />
-                </div>
+                <Terminal className="w-5 h-5" />
                 {sidebarOpen && (
-                  <span className="text-sm">{model.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{model.name}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        model.costLevel === 'High'
+                          ? 'bg-red-100 text-red-700'
+                          : model.costLevel === 'Medium'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-green-100 text-green-700'
+                      }`}>
+                        {model.costLevel}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-500 truncate block">
+                      {model.features[0]}
+                    </span>
+                  </div>
                 )}
               </button>
             ))}
@@ -601,140 +955,306 @@ module.exports = {
         </div>
 
         {/* Bottom Buttons */}
-        <div className="mt-auto p-4 flex flex-col gap-2">
+        <div className="mt-auto p-4 space-y-2">
           {/* Toggle research button */}
           <button
             onClick={() => setShowResearchView(!showResearchView)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-gray-50"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <FileCode className="w-4 h-4 text-gray-600" />
-            {sidebarOpen && <span className="text-sm">Research</span>}
+            <FileCode className="w-4 h-4" />
+            {sidebarOpen && <span className="text-sm">Research View</span>}
           </button>
 
           {/* Placeholder settings */}
-          <button className="flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-gray-50">
-            <Settings className="w-4 h-4 text-gray-600" />
+          <button 
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Settings className="w-4 h-4" />
             {sidebarOpen && <span className="text-sm">Settings</span>}
           </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {showResearchView ? (
           <div className="flex-1 p-4 lg:p-8 overflow-y-auto">
-            <h1 className="text-2xl lg:text-3xl font-bold mb-4">
-              Research for Project: {selectedProject.toUpperCase()}
-            </h1>
-            <p className="mb-6 text-gray-700">
-              {/* You can dynamically load or generate research data here. For now, just a placeholder. */}
-              This is where in-depth market or technical research would appear, relevant to the current project type. 
-              For a DeFi Protocol, you might display competitor analysis, yield strategies, or tokenomics references.
-            </p>
-            <div className="space-y-4 text-gray-700 text-sm leading-relaxed">
-              <h2 className="font-semibold">SWOT Analysis (Example)</h2>
-              <ul className="list-disc list-inside">
-                <li><strong>Strengths:</strong> High composability, global liquidity, permissionless usage.</li>
-                <li><strong>Weaknesses:</strong> Smart contract exploits, volatility, complex UI for newcomers.</li>
-                <li><strong>Opportunities:</strong> Growing DeFi adoption, potential to partner with stablecoin providers.</li>
-                <li><strong>Threats:</strong> Regulatory clampdowns, black swan market events, high competition.</li>
-              </ul>
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+                  {selectedProjectDetails?.name} Analysis
+                </h1>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  selectedProjectDetails?.complexity === 'High'
+                    ? 'bg-red-100 text-red-700'
+                    : selectedProjectDetails?.complexity === 'Medium'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-green-100 text-green-700'
+                }`}>
+                  {selectedProjectDetails?.complexity} Complexity
+                </span>
+              </div>
 
-              <h2 className="font-semibold">PESTEL Analysis (Example)</h2>
-              <ul className="list-disc list-inside">
-                <li><strong>Political:</strong> Varying regulations on DeFi worldwide.</li>
-                <li><strong>Economic:</strong> Market downturns can reduce user appetite for staking.</li>
-                <li><strong>Social:</strong> Younger demographics leaning more into crypto investments.</li>
-                <li><strong>Technological:</strong> Layer-2 solutions improving scalability.</li>
-                <li><strong>Environmental:</strong> PoS transitions helping reduce energy usage.</li>
-                <li><strong>Legal:</strong> KYC/AML issues for large pools or institutional adoption.</li>
-              </ul>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h2 className="text-lg font-semibold mb-4">Key Features</h2>
+                  <ul className="space-y-2">
+                    {selectedProjectDetails?.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-gray-700">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h2 className="text-lg font-semibold mb-4">Market Analysis</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-medium text-gray-900 mb-2">Market Size</h3>
+                      <div className="bg-gray-100 rounded-lg p-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Current TVL</span>
+                          <span className="font-medium">$1.2B</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm mt-2">
+                          <span className="text-gray-600">Growth Rate</span>
+                          <span className="font-medium text-green-600">+15% MoM</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="font-medium text-gray-900 mb-2">Competition</h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
+                          <span>Aave</span>
+                          <span className="font-medium">32% Market Share</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
+                          <span>Compound</span>
+                          <span className="font-medium">28% Market Share</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
+                          <span>Others</span>
+                          <span className="font-medium">40% Market Share</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
+                <h2 className="text-lg font-semibold mb-4">Risk Analysis</h2>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3 bg-red-50 text-red-700 rounded-lg">
+                    <AlertCircle className="w-5 h-5" />
+                    <div>
+                      <span className="font-medium">High Risk:</span>
+                      <span className="ml-1">Smart contract vulnerabilities</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-yellow-50 text-yellow-700 rounded-lg">
+                    <AlertCircle className="w-5 h-5" />
+                    <div>
+                      <span className="font-medium">Medium Risk:</span>
+                      <span className="ml-1">Market volatility impact</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-green-50 text-green-700 rounded-lg">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <div>
+                      <span className="font-medium">Low Risk:</span>
+                      <span className="ml-1">Regulatory compliance (with KYC)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border p-6">
+                <h2 className="text-lg font-semibold mb-4">Development Timeline</h2>
+                <div className="space-y-4">
+                  <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
+                    <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
+                    <h3 className="font-medium text-gray-900">Phase 1: Smart Contract Development</h3>
+                    <p className="text-sm text-gray-600 mt-1">2-3 weeks</p>
+                  </div>
+                  <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
+                    <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
+                    <h3 className="font-medium text-gray-900">Phase 2: Security Audit</h3>
+                    <p className="text-sm text-gray-600 mt-1">2 weeks</p>
+                  </div>
+                  <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
+                    <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
+                    <h3 className="font-medium text-gray-900">Phase 3: Frontend Development</h3>
+                    <p className="text-sm text-gray-600 mt-1">3-4 weeks</p>
+                  </div>
+                  <div className="relative pl-8">
+                    <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
+                    <h3 className="font-medium text-gray-900">Phase 4: Testing & Deployment</h3>
+                    <p className="text-sm text-gray-600 mt-1">1-2 weeks</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
           <div className="flex-1 flex flex-col h-full overflow-hidden">
-            {/* Requirements input - Full width on mobile */}
-            <div className="p-3 lg:p-4 bg-white border-b flex items-center gap-2">
-              <input
-                type="text"
-                value={currentRequirement}
-                onChange={(e) => setCurrentRequirement(e.target.value)}
-                placeholder="Add requirement..."
-                className="flex-1 p-2 lg:p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm lg:text-base"
-              />
-              <button
-                onClick={handleAddRequirement}
-                className="bg-blue-500 text-white p-2 lg:p-3 rounded-xl hover:bg-blue-600 transition-colors flex-shrink-0"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
+            {/* Requirements Input */}
+            <div className="p-4 bg-white border-b">
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={currentRequirement}
+                  onChange={(e) => setCurrentRequirement(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddRequirement()}
+                  placeholder="Add requirement..."
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+                <button
+                  onClick={handleAddRequirement}
+                  className="bg-blue-500 text-white p-2.5 rounded-xl hover:bg-blue-600 transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+
+              {requirements.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {requirements.map((req, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-sm"
+                    >
+                      <span className="text-gray-700">{req}</span>
+                      <button
+                        onClick={() => handleRemoveRequirement(idx)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Chat Messages - Scrollable */}
-            <div className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-4">
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {currentAgentChats.map((message) => (
                 <div
                   key={message.id}
                   className={`flex items-start gap-3 ${
                     message.sender === 'user' ? 'flex-row-reverse' : ''
                   }`}
-                  >
-                    {/* Icon */}
+                >
                   <div
-                    className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                      message.sender === 'user' ? 'bg-blue-100' : 'bg-gray-100'
+                    className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                      message.sender === 'user'
+                        ? 'bg-blue-100'
+                        : 'bg-gray-100'
                     }`}
                   >
                     {message.sender === 'user' ? (
-                      <Zap className="w-4 h-4 text-blue-600" />
+                      <Zap className="w-5 h-5 text-blue-600" />
                     ) : (
-                      <Bot className="w-4 h-4 text-gray-600" />
+                      selectedAgentDetails?.icon || <Bot className="w-5 h-5 text-gray-600" />
                     )}
                   </div>
 
-{/* Message content */}
                   <div
-                    className={`p-3 rounded-xl max-w-[85%] lg:max-w-[75%] ${
-                      message.sender === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-800'
+                    className={`flex-1 max-w-[80%] ${
+                      message.status === 'pending' ? 'opacity-70' : ''
                     }`}
                   >
-                    <p className="text-sm lg:text-base">{message.content}</p>
+                    <div
+                      className={`p-4 rounded-2xl ${
+                        message.sender === 'user'
+                          ? 'bg-blue-500 text-white ml-auto'
+                          : 'bg-white border shadow-sm'
+                      }`}
+                    >
+                      {message.status === 'pending' ? (
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 animate-spin" />
+                          <span>{message.content}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm lg:text-base">{message.content}</p>
 
-                    {/* Code snippet(s) */}
-                    {message.codeBlocks?.length ? (
-                      <pre className="mt-2 bg-gray-800 text-green-200 p-2 rounded-md text-xs overflow-x-auto">
-                        {message.codeBlocks.join("\n")}
-                      </pre>
-                    ) : null}
+                          {message.codeBlocks?.length ? (
+                            <div className="mt-3 space-y-2">
+                              {message.codeBlocks.map((block, idx) => (
+                                <pre key={idx} className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs lg:text-sm overflow-x-auto">
+                                  {block}
+                                </pre>
+                              ))}
+                            </div>
+                          ) : null}
 
-                    {/* AI suggestions */}
-                    {message.aiSuggestions?.length ? (
-                      <ul className="mt-2 text-xs lg:text-sm text-yellow-800 list-disc list-inside">
-                        {message.aiSuggestions.map((sug, idx) => (
-                          <li key={idx}>{sug}</li>
-                        ))}
-                      </ul>
-                    ) : null}
+                          {/* AI suggestions */}
+                          {message.securityChecks?.length ? (
+                            <div className="mt-3 space-y-1.5">
+                              {message.securityChecks.map((check, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
+                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                  <span>{check}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {message.aiSuggestions?.length ? (
+                            <div className="mt-3 space-y-1.5">
+                              {message.aiSuggestions.map((sug, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm text-blue-700">
+                                  <Zap className="w-4 h-4" />
+                                  <span>{sug}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+                      {message.sender === 'ai' && selectedAgentDetails && (
+                        <>
+                          <span className="font-medium">{selectedAgentDetails.name}</span>
+                          <span>•</span>
+                        </>
+                      )}
+                      <span>
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Chat Input - Fixed at bottom */}
-            <form onSubmit={handleSendMessage} className="p-3 lg:p-4 border-t bg-white">
-              <div className="flex gap-2">
+            {/* Chat Input */}
+            <form onSubmit={handleSendMessage} className="p-4 border-t bg-white">
+              <div className="flex items-center gap-3">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Type your message..."
-                  className="flex-1 p-2 lg:p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm lg:text-base"
+                  placeholder={`Ask ${selectedAgentDetails?.name || 'AI'} anything...`}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  disabled={isProcessing}
                 />
                 <button
                   type="submit"
-                  className="bg-blue-500 text-white p-2 lg:p-3 rounded-xl hover:bg-blue-600 transition-colors flex-shrink-0"
+                  disabled={isProcessing}
+                  className={`bg-blue-500 text-white p-2.5 rounded-xl transition-colors ${
+                    isProcessing 
+                      ? 'opacity-75 cursor-not-allowed'
+                      : 'hover:bg-blue-600'
+                  }`}
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -744,25 +1264,30 @@ module.exports = {
         )}
       </div>
 
-      {/* Right Panel - Editor - Collapses to full width on mobile */}
-      <div className="w-full lg:w-[36rem] bg-white border-l shadow-md flex flex-col h-screen">
-        {/* Editor Header */}
-        <div className="flex items-center justify-between p-3 lg:p-4 border-b">
-          <h2 className="font-semibold text-gray-800">Code Editor</h2>
-          <div className="flex gap-2">
+      {/* Editor Panel */}
+      <div className="w-full lg:w-[40rem] bg-white border-l shadow-md flex flex-col h-screen">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-3">
+            <FileCode className="w-5 h-5 text-gray-500" />
+            <h2 className="font-semibold text-gray-800">Smart Contract Editor</h2>
+          </div>
+          <div className="flex items-center gap-2">
             <button
               onClick={handleDownloadContract}
-              className="p-2 rounded-lg hover:bg-gray-100"
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Download Contract"
             >
               <Download className="w-5 h-5 text-gray-600" />
             </button>
-            <button className="p-2 rounded-lg hover:bg-gray-100">
+            <button
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Editor Settings"
+            >
               <Settings className="w-5 h-5 text-gray-600" />
             </button>
           </div>
         </div>
 
-        {/* Monaco Editor + Security Panel */}
         <div className="flex-1">
           <MultiFileEditor
             files={files}
