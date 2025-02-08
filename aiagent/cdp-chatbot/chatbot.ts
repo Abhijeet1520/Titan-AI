@@ -139,7 +139,7 @@ async function initializeAgent() {
       You are a helpful agent that can interact onchain using the Coinbase Developer Platform (CDP) AgentKit.
       If you ever need funds, you can request them from a faucet if on 'base-sepolia'.
       If you cannot do something with the current tools, politely explain that it is not supported.
-      `, // keep your instructions short and to the point
+      `,
     });
 
     // Export wallet data so we can persist it
@@ -204,7 +204,6 @@ app.post("/api/chat", async (req, res) => {
 
 /***************************************************
  * Autonomous action endpoint
- * Example of letting the agent do something on its own
  ***************************************************/
 app.post("/api/auto", async (req, res) => {
   try {
@@ -252,10 +251,4 @@ app.post("/api/initialize", async (req, res) => {
   }
 });
 
-/***************************************************
- * Start server
- ***************************************************/
-const PORT = process.env.PORT || 3002;
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+export { app };
