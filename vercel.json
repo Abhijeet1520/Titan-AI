@@ -2,10 +2,6 @@
   "version": 2,
   "builds": [
     {
-      "src": "frontend/next.config.js",
-      "use": "@vercel/next"
-    },
-    {
       "src": "aiagent/server.ts",
       "use": "@vercel/node"
     }
@@ -17,7 +13,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/frontend/$1"
+      "dest": "server.ts"
     }
   ]
 }

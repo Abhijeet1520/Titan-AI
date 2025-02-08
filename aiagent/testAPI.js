@@ -1,8 +1,5 @@
 const axios = require("axios");
 const { app } = require("./dist/chatbot");
-// ^ if you are transpiling TypeScript into `dist/`
-//   and your final compiled server file is named `server.js`
-//   If you're using ts-node, you'll reference './src/server' instead.
 
 const PORT = process.env.PORT || 3001;
 

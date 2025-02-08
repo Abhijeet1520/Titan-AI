@@ -392,12 +392,4 @@ app.get("/", (req, res) => {
   res.send("Server is running.");
 });
 
-/***************************************************
- * HTTP listener
- ***************************************************/
-const PORT = process.env.PORT || 3002;
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
-
 export { app };
