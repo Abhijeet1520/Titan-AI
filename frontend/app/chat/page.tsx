@@ -2,7 +2,6 @@
 import Editor from "@monaco-editor/react";
 import {
   AlertCircle,
-  Blocks,
   Bot,
   Brain,
   CheckCircle2,
@@ -10,8 +9,10 @@ import {
   Database,
   Download,
   FileCode,
+  Fullscreen,
   GitBranch,
   Layout,
+  Minimize,
   Plus,
   Send,
   Settings,
@@ -20,10 +21,16 @@ import {
   Trash2,
   Wallet,
   Zap
-} from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import SplitPane from 'react-split-pane';
-import Image from 'next/image';
+} from "lucide-react";
+import React, { useEffect, useState } from "react";
+import SplitPane from "react-split-pane";
+import Image from "next/image";
+
+import { agentsData } from "@/data/agents";
+import { projectTypesData } from "@/data/projectTypes";
+import { chatModelsData } from "@/data/chatModels";
+import { defaultRequirements } from "@/data/defaultRequirements";
+import { bigDefiContract, readmeContent, deployConfig } from "@/data/contractTemplates";
 
 /* -------------------------------------------------------------------
   TYPES & INTERFACES
@@ -31,30 +38,13 @@ import Image from 'next/image';
 interface Message {
   id: number;
   content: string;
-  sender: 'user' | 'ai';
-  agentId: string;          // which agent this message belongs to
+  sender: "user" | "ai";
+  agentId: string; // which agent this message belongs to
   timestamp: Date;
   codeBlocks?: string[];
   securityChecks?: string[];
   aiSuggestions?: string[];
-  status?: 'pending' | 'complete' | 'error';
-}
-
-interface Agent {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  expertise: string[];
-}
-
-interface ProjectType {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  features: string[];
-  complexity: 'Low' | 'Medium' | 'High';
+  status?: "pending" | "complete" | "error";
 }
 
 interface CodeFile {
@@ -69,7 +59,7 @@ interface ChatModel {
   name: string;
   description: string;
   features: string[];
-  costLevel: 'Low' | 'Medium' | 'High';
+  costLevel: "Low" | "Medium" | "High";
 }
 
 /* -------------------------------------------------------------------
@@ -80,12 +70,14 @@ interface MultiFileEditorProps {
   files: CodeFile[];
   setFiles: React.Dispatch<React.SetStateAction<CodeFile[]>>;
   isFullscreen: boolean; // Whether the editor is expanded to full-screen
+  setIsFullscreen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   files,
   setFiles,
-  isFullscreen
+  isFullscreen,
+  setIsFullscreen
 }) => {
   // track which file is active
   const [activeTab, setActiveTab] = useState(0);
@@ -102,7 +94,21 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   };
 
   return (
-    <div className={`flex flex-col h-full relative ${isFullscreen ? 'fixed inset-0 z-50 bg-white' : ''}`}>
+    <div
+      className={
+        isFullscreen
+          ? "fixed top-[6%] left-0 w-[100%] h-[95%] z-[999] bg-white flex flex-col"
+          : "relative h-full flex flex-col"
+      }
+    >
+      {isFullscreen && (
+        <button
+          onClick={() => setIsFullscreen(false)}
+          className="absolute right-0 p-2 m-2 bg-gray-200 rounded-md shadow text-sm z-[9999] flex items-center gap-2"
+        >
+          <Minimize className="w-4 h-4" />
+        </button>
+      )}
       {/* Tabs with file info */}
       <div className="flex items-center border-b bg-gray-50 overflow-x-auto">
         <div className="flex-1 flex">
@@ -110,15 +116,19 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
             <button
               key={idx}
               onClick={() => setActiveTab(idx)}
-              className={`px-4 py-3 flex items-center gap-2 border-r min-w-[150px]
-                ${activeTab === idx
-                  ? 'bg-white border-b-2 border-b-blue-500 font-medium'
-                  : 'hover:bg-gray-100'
+              className={`flex items-center gap-2 border-r min-w-[8rem]
+                px-3 py-2
+                ${
+                  activeTab === idx
+                    ? "bg-white border-b-2 border-b-blue-500 font-medium"
+                    : "hover:bg-gray-100"
                 }`}
             >
               <FileCode className="w-4 h-4 text-gray-500" />
               <div className="flex flex-col items-start">
-                <span className="text-sm truncate max-w-[100px]">{file.name}</span>
+                <span className="text-sm truncate max-w-[12rem]">
+                  {file.name}
+                </span>
                 <span className="text-xs text-gray-500">
                   {new Date(file.lastModified).toLocaleTimeString()}
                 </span>
@@ -126,15 +136,17 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
             </button>
           ))}
         </div>
-        <div className="flex-shrink-0 border-l px-2">
+        {/* <div className="flex-shrink-0 border-l px-2">
           <button
-            onClick={() => console.log("Add more settings for the editor if needed")}
+            onClick={() =>
+              console.log("Add more settings for the editor if needed")
+            }
             className="p-2 hover:bg-gray-100 rounded-lg"
             title="Editor Settings"
           >
             <Settings className="w-4 h-4 text-gray-600" />
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* Code Editor */}
@@ -151,8 +163,8 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
               fontSize: 14,
               minimap: { enabled: true },
               scrollbar: { verticalScrollbarSize: 8 },
-              lineNumbers: 'on',
-              renderWhitespace: 'selection',
+              lineNumbers: "on",
+              renderWhitespace: "selection",
               bracketPairColorization: { enabled: true },
               formatOnPaste: true,
               formatOnType: true
@@ -172,102 +184,26 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   - Left: Chat
   - Right: Editor on top, bottom has tabs (Requirements, Research, etc.)
   - Draggable/resizable using SplitPane
-  ---------------------------------------------------------------------*/
+---------------------------------------------------------------------*/
 function Home() {
   // State declarations
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState('0x1234...5678');
+  const [walletAddress, setWalletAddress] = useState("0x1234...5678");
 
   // Agents (multiple)
-  const agents: Agent[] = [
-    {
-      id: 'research',
-      name: 'Research Agent',
-      description: 'Provides domain/market research & suggestions',
-      icon: <Brain />,
-      expertise: ['Market Analysis', 'Competitor Research', 'Trend Analysis', 'Risk Assessment']
-    },
-    {
-      id: 'developer',
-      name: 'Developer Agent',
-      description: 'Implements the contract logic',
-      icon: <Terminal />,
-      expertise: ['Smart Contracts', 'Gas Optimization', 'Testing', 'Integration']
-    },
-    {
-      id: 'auditor',
-      name: 'Auditor Agent',
-      description: 'Analyzes and audits the contract for vulnerabilities',
-      icon: <Shield />,
-      expertise: ['Security Analysis', 'Best Practices', 'Vulnerability Detection', 'Code Review']
-    },
-    {
-      id: 'deployment',
-      name: 'Deployment Specialist',
-      description: 'Handles final deployment & verification steps',
-      icon: <GitBranch />,
-      expertise: ['Network Selection', 'Contract Verification', 'Gas Estimation', 'Deployment Strategy']
-    }
-  ];
+  const agents = agentsData;
 
   // Project types
-  const projectTypes: ProjectType[] = [
-    {
-      id: 'defi',
-      name: 'DeFi Protocol',
-      description: 'Medium-High complexity staking or yield strategies',
-      icon: <Database />,
-      features: ['Multi-token Support', 'Yield Optimization', 'Flash Loans', 'Governance'],
-      complexity: 'High'
-    },
-    {
-      id: 'nft',
-      name: 'NFT Platform',
-      description: 'Minting, marketplace, and royalties',
-      icon: <FileCode />,
-      features: ['ERC-721/1155', 'Marketplace', 'Royalties', 'Metadata'],
-      complexity: 'Medium'
-    },
-    {
-      id: 'dao',
-      name: 'DAO Framework',
-      description: 'Governance tokens, proposals, and voting',
-      icon: <Layout />,
-      features: ['Token Voting', 'Proposal System', 'Treasury Management', 'Timelock'],
-      complexity: 'High'
-    }
-  ];
+  const projectTypes = projectTypesData;
 
   // Chat Model selection
-  const chatModels: ChatModel[] = [
-    {
-      id: 'gpt-4',
-      name: 'OpenAI GPT-4',
-      description: 'Advanced reasoning model',
-      features: ['Complex Problem Solving', 'Nuanced Understanding', 'Code Generation'],
-      costLevel: 'High'
-    },
-    {
-      id: 'gpt-3.5',
-      name: 'OpenAI GPT-3.5',
-      description: 'Faster, cost-effective solution',
-      features: ['Quick Responses', 'Basic Code Help', 'Documentation'],
-      costLevel: 'Low'
-    },
-    {
-      id: 'custom-llm',
-      name: 'Custom LLM',
-      description: 'Bring-your-own fine-tuned model',
-      features: ['Specialized Knowledge', 'Custom Training', 'Private Deployment'],
-      costLevel: 'Medium'
-    }
-  ];
+  const chatModels = chatModelsData;
 
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('research');
-  const [selectedProject, setSelectedProject] = useState('defi');
-  const [selectedModel, setSelectedModel] = useState('gpt-4');
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("research");
+  const [selectedProject, setSelectedProject] = useState("defi");
+  const [selectedModel, setSelectedModel] = useState("gpt-4");
 
   // Chat messages for each agent
   const [agentMessages, setAgentMessages] = useState<{ [key: string]: Message[] }>({
@@ -279,8 +215,8 @@ function Home() {
 
   // Requirements & contract generation
   const [requirements, setRequirements] = useState<string[]>([]);
-  const [currentRequirement, setCurrentRequirement] = useState('');
-  const [generatedContract, setGeneratedContract] = useState('');
+  const [currentRequirement, setCurrentRequirement] = useState("");
+  const [generatedContract, setGeneratedContract] = useState("");
 
   // Editor + Security analysis
   const [files, setFiles] = useState<CodeFile[]>([]);
@@ -293,23 +229,15 @@ function Home() {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Bottom Tabs: requirements, research, audit, deployment
-  const bottomTabs = ['requirements', 'research', 'audit', 'deployment'] as const;
+  const bottomTabs = ["requirements", "research", "audit", "deployment"] as const;
   type BottomTab = typeof bottomTabs[number];
-  const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('requirements');
+  const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>("requirements");
 
   /* ------------------------------------------------------------------
        generateContract: Create mock contract & populate editor
   --------------------------------------------------------------------*/
   useEffect(() => {
-    const defaultReqs = [
-      "Users can stake multiple token types for yield",
-      "A reward pool is distributed every 7 days",
-      "Penalties apply if users withdraw before the cycle ends",
-      "Integrate a governance token for fee adjustments",
-      "ReentrancyGuard to protect critical flows"
-    ];
-    setRequirements(defaultReqs);
-
+    setRequirements(defaultRequirements);
   }, []);
 
   /* ------------------------------------------------------------------
@@ -319,11 +247,11 @@ function Home() {
     setIsProcessing(true);
     try {
       // Simulated wallet connection
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       setIsWalletConnected(true);
-setWalletAddress('0x1234...5678');
+      setWalletAddress("0x1234...5678");
     } catch (error) {
-      console.error('Wallet connection failed:', error);
+      console.error("Wallet connection failed:", error);
     } finally {
       setIsProcessing(false);
     }
@@ -336,7 +264,7 @@ setWalletAddress('0x1234...5678');
     if (!currentRequirement.trim()) return;
     const updated = [...requirements, currentRequirement];
     setRequirements(updated);
-    setCurrentRequirement('');
+    setCurrentRequirement("");
     generateContract(updated);
   };
 
@@ -351,284 +279,31 @@ setWalletAddress('0x1234...5678');
   --------------------------------------------------------------------*/
   const generateContract = (reqs?: string[]) => {
     const finalReqs = reqs || requirements;
-    const bigDefiContract = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-
-/**
- * @title MyAdvancedDeFi
- * @dev Advanced DeFi protocol with multi-token staking and governance
- * Requirements:
-${finalReqs.map((r, i) => ` * ${i + 1}. ${r}`).join('\n')}
- */
-contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
-    IERC20 public stakeTokenA;
-    IERC20 public stakeTokenB;
-    IERC20 public governanceToken;
-
-    struct UserInfo {
-        uint256 amountA;
-        uint256 amountB;
-        uint256 lastStakeTime;
-        uint256 rewardDebt;
-    }
-
-    mapping(address => UserInfo) public userInfo;
-    uint256 public rewardPool;
-    uint256 public penaltyPeriod = 7 days;
-    uint256 public penaltyFee = 10;
-    uint256 public constant PRECISION = 1e18;
-
-    event Staked(address indexed user, address token, uint256 amount);
-    event Withdrawn(address indexed user, address token, uint256 amount, uint256 penalty);
-    event RewardsClaimed(address indexed user, uint256 amount);
-    event PenaltyUpdated(uint256 oldFee, uint256 newFee);
-
-    constructor(
-        address _tokenA,
-        address _tokenB,
-        address _govToken,
-        uint256 _initialRewards
-    ) {
-        require(_tokenA != address(0), "Invalid token A address");
-        require(_tokenB != address(0), "Invalid token B address");
-        require(_govToken != address(0), "Invalid governance token address");
-
-        stakeTokenA = IERC20(_tokenA);
-        stakeTokenB = IERC20(_tokenB);
-        governanceToken = IERC20(_govToken);
-        rewardPool = _initialRewards;
-    }
-
-    modifier validateToken(address token) {
-        require(
-            token == address(stakeTokenA) || token == address(stakeTokenB),
-            "Unsupported token"
-        );
-        _;
-    }
-
-    function stake(address token, uint256 amount)
-        external
-        nonReentrant
-        validateToken(token)
-        whenNotPaused
-    {
-        require(amount > 0, "Cannot stake zero tokens");
-        UserInfo storage user = userInfo[msg.sender];
-
-        if (token == address(stakeTokenA)) {
-            stakeTokenA.transferFrom(msg.sender, address(this), amount);
-            user.amountA += amount;
-        } else {
-            stakeTokenB.transferFrom(msg.sender, address(this), amount);
-            user.amountB += amount;
-        }
-
-        user.lastStakeTime = block.timestamp;
-        emit Staked(msg.sender, token, amount);
-    }
-
-    function withdraw(address token, uint256 amount)
-        external
-        nonReentrant
-        validateToken(token)
-        whenNotPaused
-    {
-        UserInfo storage user = userInfo[msg.sender];
-        require(
-            token == address(stakeTokenA) ? amount <= user.amountA : amount <= user.amountB,
-            "Insufficient balance"
-        );
-
-        if (token == address(stakeTokenA)) {
-            user.amountA -= amount;
-        } else {
-            user.amountB -= amount;
-        }
-
-        uint256 penalty = _calculatePenalty(user, amount);
-        uint256 finalAmount = amount - penalty;
-
-        IERC20(token).transfer(msg.sender, finalAmount);
-        if (penalty > 0) {
-            IERC20(token).transfer(address(this), penalty);
-        }
-
-        emit Withdrawn(msg.sender, token, amount, penalty);
-    }
-
-    function claimRewards() external nonReentrant whenNotPaused {
-        UserInfo storage user = userInfo[msg.sender];
-        uint256 pending = _calculateRewards(msg.sender);
-        require(pending > 0, "No rewards to claim");
-
-        user.rewardDebt = block.timestamp;
-        rewardPool -= pending;
-
-        require(
-            governanceToken.transfer(msg.sender, pending),
-            "Reward transfer failed"
-        );
-
-        emit RewardsClaimed(msg.sender, pending);
-    }
-
-    function _calculatePenalty(UserInfo memory user, uint256 amount)
-        internal
-        view
-        returns (uint256)
-    {
-        if (block.timestamp < user.lastStakeTime + penaltyPeriod) {
-            return (amount * penaltyFee) / 100;
-        }
-        return 0;
-    }
-
-    function _calculateRewards(address _user) internal view returns (uint256) {
-        UserInfo memory userInfo = userInfo[_user];
-        uint256 timeElapsed = block.timestamp - userInfo.rewardDebt;
-        uint256 totalStaked = userInfo.amountA + userInfo.amountB;
-
-        if (timeElapsed == 0 || totalStaked == 0) return 0;
-
-        return (totalStaked * timeElapsed * PRECISION) / (7 days);
-    }
-
-    // Governance functions
-    function updatePenaltyFee(uint256 newFee) external {
-        require(
-            governanceToken.balanceOf(msg.sender) >= 1000 * PRECISION,
-            "Insufficient governance tokens"
-        );
-        require(newFee <= 20, "Fee too high");
-
-        emit PenaltyUpdated(penaltyFee, newFee);
-        penaltyFee = newFee;
-    }
-
-    // Emergency functions
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    function emergencyWithdraw(address token) external nonReentrant {
-        require(paused(), "Protocol must be paused");
-        UserInfo storage user = userInfo[msg.sender];
-
-        uint256 amount = token == address(stakeTokenA) ? user.amountA : user.amountB;
-        require(amount > 0, "No tokens to withdraw");
-
-        if (token == address(stakeTokenA)) {
-            user.amountA = 0;
-        } else {
-            user.amountB = 0;
-        }
-
-        IERC20(token).transfer(msg.sender, amount);
-        emit Withdrawn(msg.sender, token, amount, 0);
-    }
-}`;
+    const bigContract = bigDefiContract
+      .replace("// ...the big solidity contract string...", "SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n// ...rest of contract...");
+    // We use the other templates for the readme and deployment config
+    const readme = readmeContent
+      .replace("// ...the markdown README content...", "## Implementation details\n// ...rest of README...");
+    const deployConf = deployConfig
+      .replace("// ...the deployment configuration string...", "// Custom deployment instructions here");
 
     // Additional files for the editor
-    const readmeContent = `# MyAdvancedDeFi Protocol
-
-## Overview
-This is a production-ready DeFi protocol implementing:
-${finalReqs.map(r => `- ${r}`).join('\n')}
-
-## Features
-- Multi-token staking support
-- Time-based rewards distribution
-- Early withdrawal penalties
-- Governance integration
-- Emergency withdrawal mechanism
-- Comprehensive security measures
-
-## Security Features
-- ReentrancyGuard for all state-changing functions
-- Pausable for emergency situations
-- Precise mathematical calculations
-- Event emission for transparency
-- Input validation and bounds checking
-
-## Deployment
-1. Deploy governance token
-2. Deploy staking tokens (if new)
-3. Deploy main contract with:
-   - Token A address
-   - Token B address
-   - Governance token address
-   - Initial rewards amount
-
-## Testing
-Run full test suite before deployment:
-\`\`\`bash
-npx hardhat test
-npx hardhat coverage
-\`\`\`
-
-## Audit Status
-Pending security audit. Key areas to review:
-- Reward calculation precision
-- Withdrawal penalty logic
-- Governance token integration
-- Emergency procedures`;
-
-    const deployConfig = `// Deployment Configuration
-module.exports = {
-  // Network selection
-  network: "goerli",
-
-  // Contract addresses
-  tokenA: "0xTokenA...",  // Staking token A
-  tokenB: "0xTokenB...",  // Staking token B
-  govToken: "0xGov...",   // Governance token
-
-  // Initial parameters
-  initialRewards: "1000000000000000000000", // 1,000 tokens (18 decimals)
-
-  // Verification settings
-  verify: true,
-
-  // Constructor arguments
-  constructorArgs: [
-    "0xTokenA...",
-    "0xTokenB...",
-    "0xGov...",
-    "1000000000000000000000"
-  ],
-
-  // Gas settings
-  gasPrice: "auto",
-  gasLimit: 5000000
-};`;
-
-    // Populate the editor with 3 files
     const initialFiles: CodeFile[] = [
       {
         name: "MyAdvancedDeFi.sol",
-        content: bigDefiContract,
-        language: "solidity",
+        content: bigContract,
+        language: "sol",
         lastModified: new Date()
       },
       {
         name: "README.md",
-        content: readmeContent,
+        content: readme,
         language: "markdown",
         lastModified: new Date()
       },
       {
         name: "deploy-config.js",
-        content: deployConfig,
+        content: deployConf,
         language: "javascript",
         lastModified: new Date()
       }
@@ -670,20 +345,20 @@ module.exports = {
     const userMsg: Message = {
       id: oldMessages.length + 1,
       content: input,
-      sender: 'user',
+      sender: "user",
       agentId,
       timestamp: new Date(),
-      status: 'complete'
+      status: "complete"
     };
 
     // Mock AI "thinking"
     const processingMsg: Message = {
       id: oldMessages.length + 2,
-      content: 'Analyzing your request...',
-      sender: 'ai',
+      content: "Analyzing your request...",
+      sender: "ai",
       agentId,
       timestamp: new Date(),
-      status: 'pending'
+      status: "pending"
     };
 
     setAgentMessages({
@@ -692,18 +367,18 @@ module.exports = {
     });
 
     // Simulate AI response delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const aiMsg: Message = {
       id: oldMessages.length + 2,
       content: `Here's an updated implementation based on your request. (Using ${selectedModel})`,
-      sender: 'ai',
+      sender: "ai",
       agentId,
       timestamp: new Date(),
       codeBlocks: [generatedContract],
       securityChecks: latestSecurityChecks,
       aiSuggestions: aiSuggestions,
-      status: 'complete'
+      status: "complete"
     };
 
     setAgentMessages({
@@ -711,7 +386,7 @@ module.exports = {
       [agentId]: [...oldMessages, userMsg, aiMsg]
     });
 
-    setInput('');
+    setInput("");
     setIsProcessing(false);
   };
 
@@ -719,10 +394,10 @@ module.exports = {
        handleDownloadContract: Let user download .sol file
   --------------------------------------------------------------------*/
   const handleDownloadContract = () => {
-    const element = document.createElement('a');
-    const file = new Blob([generatedContract], { type: 'text/plain' });
+    const element = document.createElement("a");
+    const file = new Blob([generatedContract], { type: "text/plain" });
     element.href = URL.createObjectURL(file);
-    element.download = 'MyAdvancedDeFi.sol';
+    element.download = "MyAdvancedDeFi.sol";
     document.body.appendChild(element);
     element.click();
   };
@@ -731,31 +406,38 @@ module.exports = {
        Render
   --------------------------------------------------------------------*/
   const currentAgentChats = agentMessages[selectedAgentId] || [];
-  const selectedAgentDetails = agents.find(a => a.id === selectedAgentId);
-  const selectedProjectDetails = projectTypes.find(p => p.id === selectedProject);
+  const selectedAgentDetails = agents.find((a) => a.id === selectedAgentId);
+  const selectedProjectDetails = projectTypes.find((p) => p.id === selectedProject);
 
-  // Resizer styles
+  // SplitPane resizer styles (still possible to use a small px or your own classes)
   const verticalResizerStyle: React.CSSProperties = {
-    width: '8px',
-    background: '#e2e8f0',
-    cursor: 'col-resize',
-    margin: '0 2px',
-    zIndex: 1,
+    width: "6px",
+    background: "#e2eff0",
+    cursor: "col-resize",
+    margin: "0 2px",
+    zIndex: 1
   };
   const horizontalResizerStyle: React.CSSProperties = {
-    height: '4px',
-    background: '#e2e8f0',
-    cursor: 'row-resize',
-    margin: '2px 0',
-    zIndex: 1,
+    height: "6px",
+    minHeight: "3px",
+    background: "#e2eff0",
+    cursor: "row-resize",
+    margin: "0",
+    zIndex: 1
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col h-full w-full">
       {/* Top Bar: LLM dropdown + Wallet Connect */}
-      <div className="w-full h-14 flex items-center justify-between bg-white border-b px-4">
-        <div className="flex items-center gap-3">
-          <Image src="/android-chrome-192x192.png" alt="Titan AI Logo" width={32} height={32} />
+      <div className="h-14 flex items-center justify-between bg-white border-b px-6">
+        <div className="flex items-center gap-4">
+          <Image
+            src="/android-chrome-192x192.png"
+            alt="Titan AI Logo"
+            width={32}
+            height={32}
+            className="object-contain"
+          />
           <span className="font-bold text-xl text-blue-600">Titan AI</span>
 
           {/* Project selection (Optional) */}
@@ -767,7 +449,7 @@ module.exports = {
               generateContract(requirements);
             }}
           >
-            {projectTypes.map(pt => (
+            {projectTypes.map((pt) => (
               <option key={pt.id} value={pt.id}>
                 {pt.name}
               </option>
@@ -777,14 +459,14 @@ module.exports = {
 
         <div className="flex items-center gap-4">
           {/* LLM Models Dropdown */}
-          <div>
+          <div className="flex items-center">
             <label className="mr-1 text-sm text-gray-600">Model:</label>
             <select
               className="border border-gray-300 rounded-lg px-2 py-1 text-sm"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
             >
-              {chatModels.map(model => (
+              {chatModels.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.name}
                 </option>
@@ -796,19 +478,18 @@ module.exports = {
           <button
             onClick={handleConnectWallet}
             disabled={isProcessing}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               isWalletConnected
-                ? 'bg-green-50 text-green-700 border border-green-200'
-                : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-            } ${isProcessing ? 'opacity-75 cursor-not-allowed' : ''}`}
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+            } ${isProcessing ? "opacity-75 cursor-not-allowed" : ""}`}
           >
-            <Wallet className="w-4 h-4" />
+            <Wallet className="w-5 h-5" />
             {isProcessing
-              ? 'Connecting...'
+              ? "Connecting..."
               : isWalletConnected
-                ? walletAddress
-                : 'Connect Wallet'
-            }
+              ? walletAddress
+              : "Connect Wallet"}
           </button>
         </div>
       </div>
@@ -818,22 +499,23 @@ module.exports = {
       <SplitPane
         split="vertical"
         defaultSize="60%"
-        minSize={300}
+        minSize="20%"
         resizerStyle={verticalResizerStyle}
-        style={{ position: 'relative', flex: 1 }}
+        style={{ position: "relative", flex: 1 }}
       >
         {/* LEFT: Chat Panel */}
-        <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden">
-          {/* Agent selection (optional) */}
+        <div className="flex flex-col h-full overflow-y-scroll overflow-x-hidden">
+          {/* Agent selection */}
           <div className="flex gap-2 p-3 border-b bg-gray-50">
-            {agents.map(agent => (
+            {agents.map((agent) => (
               <button
                 key={agent.id}
                 onClick={() => setSelectedAgentId(agent.id)}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-                  ${selectedAgentId === agent.id
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
+                  ${
+                    selectedAgentId === agent.id
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
                   }`}
               >
                 {agent.icon}
@@ -843,123 +525,132 @@ module.exports = {
           </div>
 
           {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto">
-            <div className="h-full w-full p-4 space-y-4">
-                {currentAgentChats.map((message) => (
+          <div className="flex-1 overflow-y-auto">
+            <div className="w-full p-3 space-y-3 w-max-[100] overflow-y-scroll">
+              {currentAgentChats.map((message) => (
                 <div
-                key={message.id}
-                className={`flex items-start gap-3 ${
-                message.sender === 'user' ? 'flex-row-reverse' : ''
-                }`}
-                >
-                <div
-                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                  message.sender === 'user'
-                  ? 'bg-blue-100'
-                  : 'bg-gray-100'
-                }`}
-                >
-                {message.sender === 'user' ? (
-                  <Zap className="w-5 h-5 text-blue-600" />
-                ) : (
-                  selectedAgentDetails?.icon || <Bot className="w-5 h-5 text-gray-600" />
-                )}
-                </div>
-
-                <div
-                className={`flex-1 max-w-[80%] ${
-                  message.status === 'pending' ? 'opacity-70' : ''
-                }`}
-                >
-                <div
-                  className={`p-4 rounded-2xl ${
-                  message.sender === 'user'
-                  ? 'bg-blue-500 text-white ml-auto'
-                  : 'bg-white border shadow-sm'
+                  key={message.id}
+                  className={`flex items-start gap-3 ${
+                    message.sender === "user" ? "flex-row-reverse" : ""
                   }`}
                 >
-                  {message.status === 'pending' ? (
-                  <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 animate-spin" />
-                  <span>{message.content}</span>
+                  <div
+                    className={`flex-shrink-0 rounded-full flex items-center justify-center w-10 h-10 ${
+                      message.sender === "user" ? "bg-blue-100" : "bg-gray-100"
+                    }`}
+                  >
+                    {message.sender === "user" ? (
+                      <Zap className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      selectedAgentDetails?.icon ?? (
+                        <Bot className="w-4 h-4 text-gray-600" />
+                      )
+                    )}
                   </div>
-                  ) : (
-                  <>
-                  <p className="text-sm lg:text-base">{message.content}</p>
 
-                  {message.codeBlocks?.length ? (
-                  <div className="mt-3 space-y-2">
-                    {message.codeBlocks.map((block, idx) => (
-                    <pre
-                    key={idx}
-                    className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs lg:text-sm overflow-x-auto"
+                  <div
+                    className={`flex-1 max-w-[80%] ${
+                      message.status === "pending" ? "opacity-70" : ""
+                    }`}
+                  >
+                    <div
+                      className={`p-3 rounded-2xl ${
+                        message.sender === "user"
+                          ? "bg-blue-500 text-white ml-auto"
+                          : "bg-white border shadow-sm"
+                      }`}
                     >
-                    {block}
-                    </pre>
-                    ))}
-                  </div>
-                  ) : null}
+                      {message.status === "pending" ? (
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 animate-spin" />
+                          <span>{message.content}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm lg:text-base">
+                            {message.content}
+                          </p>
+                          {message.codeBlocks?.length ? (
+                            <div className="mt-3 space-y-2">
+                              {message.codeBlocks.map((block, idx) => (
+                                <pre
+                                  key={idx}
+                                  className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs lg:text-sm overflow-x-auto"
+                                >
+                                  {block}
+                                </pre>
+                              ))}
+                            </div>
+                          ) : null}
 
-                  {/* AI suggestions */}
-                  {message.securityChecks?.length ? (
-                  <div className="mt-3 space-y-1.5">
-                    {message.securityChecks.map((check, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span>{check}</span>
-                    </div>
-                    ))}
-                  </div>
-                  ) : null}
+                          {/* AI suggestions / security checks */}
+                          {message.securityChecks?.length ? (
+                            <div className="mt-3 space-y-1.5">
+                              {message.securityChecks.map((check, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-2 text-sm text-gray-700"
+                                >
+                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                  <span>{check}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
 
-                  {message.aiSuggestions?.length ? (
-                  <div className="mt-3 space-y-1.5">
-                    {message.aiSuggestions.map((sug, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm text-blue-700">
-                    <Zap className="w-4 h-4" />
-                    <span>{sug}</span>
+                          {message.aiSuggestions?.length ? (
+                            <div className="mt-3 space-y-1.5">
+                              {message.aiSuggestions.map((sug, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-2 text-sm text-blue-700"
+                                >
+                                  <Zap className="w-5 h-5" />
+                                  <span>{sug}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
-                    ))}
+                    <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+                      {message.sender === "ai" && selectedAgentDetails && (
+                        <>
+                          <span className="font-medium">
+                            {selectedAgentDetails.name}
+                          </span>
+                          <span>•</span>
+                        </>
+                      )}
+                      <span>
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
                   </div>
-                  ) : null}
-                  </>
-                  )}
                 </div>
-                <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
-                  {message.sender === 'ai' && selectedAgentDetails && (
-                  <>
-                  <span className="font-medium">{selectedAgentDetails.name}</span>
-                  <span>•</span>
-                  </>
-                  )}
-                  <span>
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-                </div>
-                </div>
-                ))}
-              </div>
+              ))}
             </div>
+          </div>
 
           {/* Chat Input */}
-          <form onSubmit={handleSendMessage} className="p-4 border-t bg-white">
+          <form onSubmit={handleSendMessage} className="p-3 border-t bg-white">
             <div className="flex items-center gap-3">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={`Ask ${selectedAgentDetails?.name || 'AI'} anything...`}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder={`Ask ${
+                  selectedAgentDetails?.name || "AI"
+                } anything...`}
+                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 disabled={isProcessing}
               />
               <button
                 type="submit"
                 disabled={isProcessing}
-                className={`bg-blue-500 text-white p-2.5 rounded-xl transition-colors ${
-                  isProcessing
-                    ? 'opacity-75 cursor-not-allowed'
-                    : 'hover:bg-blue-600'
+                className={`bg-blue-500 text-white p-2 rounded-xl transition-colors ${
+                  isProcessing ? "opacity-75 cursor-not-allowed" : "hover:bg-blue-600"
                 }`}
               >
                 <Send className="w-5 h-5" />
@@ -973,56 +664,26 @@ module.exports = {
         <SplitPane
           split="horizontal"
           defaultSize="60%"
-          minSize={150}
+          className="h-full w-full"
+          minSize="10%"
+          maxSize="90%"
+          // style={{ position: isFullscreen ? "static" : "relative", flex: 1 }}
           resizerStyle={horizontalResizerStyle}
-          style={{ position: 'relative' }}
         >
-          {/* TOP: Editor Panel */}
-          <div className="w-full h-full flex flex-col overflow-y-auto overflow-x-hidden">
-            <div className="flex items-center justify-between p-4 border-b bg-white">
-              <div className="flex items-center gap-3">
-                <FileCode className="w-5 h-5 text-gray-500" />
-                <h2 className="font-semibold text-gray-800">Smart Contract Editor</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDownloadContract}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                  title="Download Contract"
-                >
-                  <Download className="w-5 h-5 text-gray-600" />
-                </button>
-                <button
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                  title="Toggle Fullscreen"
-                >
-                  <Blocks className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1">
-              <MultiFileEditor
-                files={files}
-                setFiles={setFiles}
-                isFullscreen={isFullscreen}
-              />
-            </div>
-          </div>
 
-          {/* BOTTOM: TABS (Requirements, Research, Audit, Deployment) */}
+          {/* TOP: TABS (Requirements, Research, Audit, Deployment) */}
           <div className="w-full h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden">
             {/* Tab Bar */}
-            <div className="flex items-center gap-2 border-b px-4 bg-gray-50">
-              {bottomTabs.map(tab => (
+            <div className="flex items-center gap-2 border-b px-3 bg-gray-50">
+              {bottomTabs.map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveBottomTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors
+                  className={`px-3 py-2 text-sm font-medium transition-colors
                     ${
                       activeBottomTab === tab
-                        ? 'border-b-2 border-blue-500 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? "border-b-2 border-blue-500 text-blue-700"
+                        : "text-gray-600 hover:bg-gray-100"
                     }`}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -1031,41 +692,44 @@ module.exports = {
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+            <div className="flex-1 overflow-y-auto p-3">
               {/* REQUIREMENTS TAB */}
-              {activeBottomTab === 'requirements' && (
+              {activeBottomTab === "requirements" && (
                 <div>
-                  <h2 className="text-lg font-semibold mb-3">Project Requirements</h2>
+                  <h2 className="text-lg font-semibold mb-3">
+                    Project Requirements
+                  </h2>
                   <div className="mb-4 flex items-center gap-3">
                     <input
                       type="text"
                       value={currentRequirement}
                       onChange={(e) => setCurrentRequirement(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddRequirement()}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && handleAddRequirement()
+                      }
                       placeholder="Add requirement..."
-                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
                     <button
                       onClick={handleAddRequirement}
-                      className="bg-blue-500 text-white p-2.5 rounded-xl hover:bg-blue-600 transition-colors"
+                      className="bg-blue-500 text-white p-2 rounded-xl hover:bg-blue-600 transition-colors"
                     >
                       <Plus className="w-5 h-5" />
                     </button>
                   </div>
-
-                  {/* List each requirement vertically */}
+                  {/* List each requirement */}
                   {requirements.length > 0 && (
                     <ul className="space-y-3">
                       {requirements.map((req, idx) => (
                         <li
                           key={idx}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-sm"
+                          className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm"
                         >
                           <button
                             onClick={() => handleRemoveRequirement(idx)}
                             className="text-gray-400 hover:text-red-500"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5" />
                           </button>
                           <span className="text-gray-700 flex-1">{req}</span>
                         </li>
@@ -1076,8 +740,8 @@ module.exports = {
               )}
 
               {/* RESEARCH TAB */}
-              {activeBottomTab === 'research' && (
-                <div className="max-w-4xl">
+              {activeBottomTab === "research" && (
+                <div className="max-w-100">
                   <h2 className="text-lg font-semibold mb-3">
                     {selectedProjectDetails?.name} Analysis
                   </h2>
@@ -1086,25 +750,33 @@ module.exports = {
                     <span className="text-gray-700">
                       {selectedProjectDetails?.description}
                     </span>
-                    <span className={`
-                      px-3 py-1 rounded-full text-sm font-medium
-                      ${selectedProjectDetails?.complexity === 'High'
-                        ? 'bg-red-100 text-red-700'
-                        : selectedProjectDetails?.complexity === 'Medium'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-green-100 text-green-700'
-                      }
-                    `}>
+                    <span
+                      className={`
+                        px-3 py-1 rounded-full text-sm font-medium
+                        ${
+                          selectedProjectDetails?.complexity === "High"
+                            ? "bg-red-100 text-red-700"
+                            : selectedProjectDetails?.complexity === "Medium"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
+                        }
+                      `}
+                    >
                       {selectedProjectDetails?.complexity} Complexity
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div className="bg-white rounded-xl shadow-sm border p-6">
-                      <h3 className="text-md font-semibold mb-4">Key Features</h3>
+                      <h3 className="text-md font-semibold mb-4">
+                        Key Features
+                      </h3>
                       <ul className="space-y-2">
                         {selectedProjectDetails?.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-gray-700">
+                          <li
+                            key={idx}
+                            className="flex items-center gap-2 text-gray-700"
+                          >
                             <CheckCircle2 className="w-4 h-4 text-green-500" />
                             <span>{feature}</span>
                           </li>
@@ -1113,10 +785,14 @@ module.exports = {
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm border p-6">
-                      <h3 className="text-md font-semibold mb-4">Market Analysis</h3>
+                      <h3 className="text-md font-semibold mb-4">
+                        Market Analysis
+                      </h3>
                       <div className="space-y-4">
                         <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Market Size</h4>
+                          <h4 className="font-medium text-gray-900 mb-2">
+                            Market Size
+                          </h4>
                           <div className="bg-gray-100 rounded-lg p-3">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">Current TVL</span>
@@ -1124,25 +800,35 @@ module.exports = {
                             </div>
                             <div className="flex items-center justify-between text-sm mt-2">
                               <span className="text-gray-600">Growth Rate</span>
-                              <span className="font-medium text-green-600">+15% MoM</span>
+                              <span className="font-medium text-green-600">
+                                +15% MoM
+                              </span>
                             </div>
                           </div>
                         </div>
 
                         <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Competition</h4>
+                          <h4 className="font-medium text-gray-900 mb-2">
+                            Competition
+                          </h4>
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
                               <span>Aave</span>
-                              <span className="font-medium">32% Market Share</span>
+                              <span className="font-medium">
+                                32% Market Share
+                              </span>
                             </div>
                             <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
                               <span>Compound</span>
-                              <span className="font-medium">28% Market Share</span>
+                              <span className="font-medium">
+                                28% Market Share
+                              </span>
                             </div>
                             <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
                               <span>Others</span>
-                              <span className="font-medium">40% Market Share</span>
+                              <span className="font-medium">
+                                40% Market Share
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1157,7 +843,9 @@ module.exports = {
                         <AlertCircle className="w-5 h-5" />
                         <div>
                           <span className="font-medium">High Risk:</span>
-                          <span className="ml-1">Smart contract vulnerabilities</span>
+                          <span className="ml-1">
+                            Smart contract vulnerabilities
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 p-3 bg-yellow-50 text-yellow-700 rounded-lg">
@@ -1171,33 +859,45 @@ module.exports = {
                         <CheckCircle2 className="w-5 h-5" />
                         <div>
                           <span className="font-medium">Low Risk:</span>
-                          <span className="ml-1">Regulatory compliance (with KYC)</span>
+                          <span className="ml-1">
+                            Regulatory compliance (with KYC)
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="bg-white rounded-xl shadow-sm border p-6">
-                    <h3 className="text-md font-semibold mb-4">Development Timeline</h3>
+                    <h3 className="text-md font-semibold mb-4">
+                      Development Timeline
+                    </h3>
                     <div className="space-y-4">
                       <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">Phase 1: Smart Contract Development</h4>
+                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
+                        <h4 className="font-medium text-gray-900">
+                          Phase 1: Smart Contract Development
+                        </h4>
                         <p className="text-sm text-gray-600 mt-1">2-3 weeks</p>
                       </div>
                       <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">Phase 2: Security Audit</h4>
+                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
+                        <h4 className="font-medium text-gray-900">
+                          Phase 2: Security Audit
+                        </h4>
                         <p className="text-sm text-gray-600 mt-1">2 weeks</p>
                       </div>
                       <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">Phase 3: Frontend Development</h4>
+                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
+                        <h4 className="font-medium text-gray-900">
+                          Phase 3: Frontend Development
+                        </h4>
                         <p className="text-sm text-gray-600 mt-1">3-4 weeks</p>
                       </div>
                       <div className="relative pl-8">
-                        <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">Phase 4: Testing & Deployment</h4>
+                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
+                        <h4 className="font-medium text-gray-900">
+                          Phase 4: Testing & Deployment
+                        </h4>
                         <p className="text-sm text-gray-600 mt-1">1-2 weeks</p>
                       </div>
                     </div>
@@ -1206,10 +906,14 @@ module.exports = {
               )}
 
               {/* AUDIT TAB (Security Analysis) */}
-              {activeBottomTab === 'audit' && (
+              {activeBottomTab === "audit" && (
                 <div>
-                  <h2 className="text-lg font-semibold mb-3">Audit & Security Analysis</h2>
-                  <p className="text-sm text-gray-500 mb-3">Below are the latest security checks:</p>
+                  <h2 className="text-lg font-semibold mb-3">
+                    Audit &amp; Security Analysis
+                  </h2>
+                  <p className="text-sm text-gray-500 mb-3">
+                    Below are the latest security checks:
+                  </p>
                   {latestSecurityChecks.length ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {latestSecurityChecks.map((check, idx) => (
@@ -1218,13 +922,15 @@ module.exports = {
                           className="flex items-start gap-2 p-2 bg-white rounded-lg border border-gray-100"
                         >
                           <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5" />
-                          <span className="text-sm text-gray-700">{check}</span>
+                          <span className="text-sm text-gray-700">
+                            {check}
+                          </span>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-gray-500 text-sm">
-                      <Clock className="w-4 h-4" />
+                      <Clock className="w-5 h-5" />
                       <span>Waiting for security analysis...</span>
                     </div>
                   )}
@@ -1232,7 +938,7 @@ module.exports = {
               )}
 
               {/* DEPLOYMENT TAB */}
-              {activeBottomTab === 'deployment' && (
+              {activeBottomTab === "deployment" && (
                 <div>
                   <h2 className="text-lg font-semibold mb-3">Deployment</h2>
                   <p className="text-sm text-gray-600">
@@ -1240,6 +946,41 @@ module.exports = {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+          {/* BOTTOM: Editor Panel */}
+          <div className="w-full h-full flex flex-col overflow-y-auto overflow-x-hidden">
+            <div className="flex items-center justify-between p-3 border-b bg-white">
+              <div className="flex items-center gap-3">
+                <FileCode className="w-4 h-4 text-gray-500" />
+                <h2 className="font-semibold text-gray-800">
+                  Smart Contract Editor
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadContract}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Download Contract"
+                >
+                  <Download className="w-4 h-4 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Toggle Fullscreen"
+                >
+                  <Fullscreen className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1">
+              <MultiFileEditor
+                files={files}
+                setFiles={setFiles}
+                isFullscreen={isFullscreen}
+                setIsFullscreen={setIsFullscreen}
+              />
             </div>
           </div>
         </SplitPane>
