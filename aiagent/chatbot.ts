@@ -210,10 +210,38 @@ async function createNewAgent(): Promise<{
 /***************************************************
  * Clean up a session if inactive
  ***************************************************/
-function cleanupSession(chatId: string) {
+async function cleanupSession(chatId: string) {
   if (SESSIONS[chatId]) {
-    console.log(`Session [${chatId}] inactive for 10 mins. Cleaning up.`);
+    console.log(`Session [${chatId}] inactive for ${SESSION_INACTIVITY_MS/1000/60} minutes. Cleaning up.`);
     delete SESSIONS[chatId];
+
+    // Process next queued session if any
+    if (QUEUE.length > 0) {
+      const nextSession = QUEUE.shift();
+      if (nextSession) {
+        try {
+          // Create new agent for queued session
+          const { agent, agentConfig } = await createNewAgent();
+
+          const inactivityTimer = setTimeout(() => {
+            cleanupSession(nextSession.chatId);
+          }, SESSION_INACTIVITY_MS);
+
+          SESSIONS[nextSession.chatId] = {
+            agent,
+            agentConfig,
+            lastActive: Date.now(),
+            inactivityTimer,
+          };
+
+          console.log(`Processed queued session [${nextSession.chatId}]. Queue length: ${QUEUE.length}`);
+        } catch (error) {
+          console.error(`Failed to process queued session [${nextSession.chatId}]:`, error);
+          // Put it back in queue if failed
+          QUEUE.unshift(nextSession);
+        }
+      }
+    }
   }
 }
 
@@ -391,6 +419,11 @@ app.get("/api/session-status", (req, res) => {
  ***************************************************/
 app.get("/", (req, res) => {
   res.send("Server is running.");
+});
+
+// Add before the root endpoint handler
+app.get("/test", (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'test.html'));
 });
 
 export { app };

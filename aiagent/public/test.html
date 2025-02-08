@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .endpoint {
+            border: 1px solid #ccc;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .method {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+        }
+        .get { background-color: #28a745; }
+        .post { background-color: #007bff; }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        button:hover {
+            background-color: #138496;
+        }
+        .response {
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 3px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Test Interface</h1>
+
+    <div class="endpoint">
+        <h2><span class="method post">POST</span> /api/start-chat</h2>
+        <p>Start a new chat session</p>
+        <textarea id="start-chat-input">{
+    "chatId": "test_123"
+}</textarea>
+        <button onclick="testEndpoint('start-chat')">Test</button>
+        <div id="start-chat-response" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2><span class="method post">POST</span> /api/chat</h2>
+        <p>Send a message to an existing chat session</p>
+        <textarea id="chat-input">{
+    "chatId": "test_123",
+    "userMessage": "Create a smart contract for token staking"
+}</textarea>
+        <button onclick="testEndpoint('chat')">Test</button>
+        <div id="chat-response" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2><span class="method get">GET</span> /api/queue-status</h2>
+        <p>Check queued requests</p>
+        <button onclick="testEndpoint('queue-status')">Test</button>
+        <div id="queue-status-response" class="response"></div>
+    </div>
+
+    <div class="endpoint">
+        <h2><span class="method get">GET</span> /api/session-status</h2>
+        <p>Check active sessions</p>
+        <button onclick="testEndpoint('session-status')">Test</button>
+        <div id="session-status-response" class="response"></div>
+    </div>
+
+    <script>
+        async function testEndpoint(endpoint) {
+            const responseDiv = document.getElementById(`${endpoint}-response`);
+            responseDiv.textContent = 'Loading...';
+
+            try {
+                let response;
+                if (endpoint === 'start-chat' || endpoint === 'chat') {
+                    const input = document.getElementById(`${endpoint}-input`).value;
+                    response = await fetch(`/api/${endpoint}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: input
+                    });
+                } else {
+                    response = await fetch(`/api/${endpoint}`);
+                }
+
+                const data = await response.json();
+                responseDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
