@@ -843,102 +843,104 @@ module.exports = {
           </div>
 
           {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4">
-            {currentAgentChats.map((message) => (
-              <div
+            <div className="flex-1 overflow-y-auto">
+            <div className="h-full w-full p-4 space-y-4">
+                {currentAgentChats.map((message) => (
+                <div
                 key={message.id}
                 className={`flex items-start gap-3 ${
-                  message.sender === 'user' ? 'flex-row-reverse' : ''
+                message.sender === 'user' ? 'flex-row-reverse' : ''
                 }`}
-              >
+                >
                 <div
-                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                    message.sender === 'user'
-                      ? 'bg-blue-100'
-                      : 'bg-gray-100'
+                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                  message.sender === 'user'
+                  ? 'bg-blue-100'
+                  : 'bg-gray-100'
+                }`}
+                >
+                {message.sender === 'user' ? (
+                  <Zap className="w-5 h-5 text-blue-600" />
+                ) : (
+                  selectedAgentDetails?.icon || <Bot className="w-5 h-5 text-gray-600" />
+                )}
+                </div>
+
+                <div
+                className={`flex-1 max-w-[80%] ${
+                  message.status === 'pending' ? 'opacity-70' : ''
+                }`}
+                >
+                <div
+                  className={`p-4 rounded-2xl ${
+                  message.sender === 'user'
+                  ? 'bg-blue-500 text-white ml-auto'
+                  : 'bg-white border shadow-sm'
                   }`}
                 >
-                  {message.sender === 'user' ? (
-                    <Zap className="w-5 h-5 text-blue-600" />
+                  {message.status === 'pending' ? (
+                  <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 animate-spin" />
+                  <span>{message.content}</span>
+                  </div>
                   ) : (
-                    selectedAgentDetails?.icon || <Bot className="w-5 h-5 text-gray-600" />
+                  <>
+                  <p className="text-sm lg:text-base">{message.content}</p>
+
+                  {message.codeBlocks?.length ? (
+                  <div className="mt-3 space-y-2">
+                    {message.codeBlocks.map((block, idx) => (
+                    <pre
+                    key={idx}
+                    className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs lg:text-sm overflow-x-auto"
+                    >
+                    {block}
+                    </pre>
+                    ))}
+                  </div>
+                  ) : null}
+
+                  {/* AI suggestions */}
+                  {message.securityChecks?.length ? (
+                  <div className="mt-3 space-y-1.5">
+                    {message.securityChecks.map((check, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span>{check}</span>
+                    </div>
+                    ))}
+                  </div>
+                  ) : null}
+
+                  {message.aiSuggestions?.length ? (
+                  <div className="mt-3 space-y-1.5">
+                    {message.aiSuggestions.map((sug, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-sm text-blue-700">
+                    <Zap className="w-4 h-4" />
+                    <span>{sug}</span>
+                    </div>
+                    ))}
+                  </div>
+                  ) : null}
+                  </>
                   )}
                 </div>
-
-                <div
-                  className={`flex-1 max-w-[80%] ${
-                    message.status === 'pending' ? 'opacity-70' : ''
-                  }`}
-                >
-                  <div
-                    className={`p-4 rounded-2xl ${
-                      message.sender === 'user'
-                        ? 'bg-blue-500 text-white ml-auto'
-                        : 'bg-white border shadow-sm'
-                    }`}
-                  >
-                    {message.status === 'pending' ? (
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 animate-spin" />
-                        <span>{message.content}</span>
-                      </div>
-                    ) : (
-                      <>
-                        <p className="text-sm lg:text-base">{message.content}</p>
-
-                        {message.codeBlocks?.length ? (
-                          <div className="mt-3 space-y-2">
-                            {message.codeBlocks.map((block, idx) => (
-                              <pre
-                                key={idx}
-                                className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs lg:text-sm overflow-x-auto"
-                              >
-                                {block}
-                              </pre>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {/* AI suggestions */}
-                        {message.securityChecks?.length ? (
-                          <div className="mt-3 space-y-1.5">
-                            {message.securityChecks.map((check, idx) => (
-                              <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                <span>{check}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {message.aiSuggestions?.length ? (
-                          <div className="mt-3 space-y-1.5">
-                            {message.aiSuggestions.map((sug, idx) => (
-                              <div key={idx} className="flex items-center gap-2 text-sm text-blue-700">
-                                <Zap className="w-4 h-4" />
-                                <span>{sug}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                  <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
-                    {message.sender === 'ai' && selectedAgentDetails && (
-                      <>
-                        <span className="font-medium">{selectedAgentDetails.name}</span>
-                        <span>•</span>
-                      </>
-                    )}
-                    <span>
-                      {new Date(message.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
+                <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+                  {message.sender === 'ai' && selectedAgentDetails && (
+                  <>
+                  <span className="font-medium">{selectedAgentDetails.name}</span>
+                  <span>•</span>
+                  </>
+                  )}
+                  <span>
+                  {new Date(message.timestamp).toLocaleTimeString()}
+                  </span>
                 </div>
+                </div>
+                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
 
           {/* Chat Input */}
           <form onSubmit={handleSendMessage} className="p-4 border-t bg-white">
