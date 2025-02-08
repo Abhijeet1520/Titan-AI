@@ -7,29 +7,16 @@ import {
   Shield,
   Zap,
   Bot,
-  Wallet,
-  Settings,
-  ChevronDown,
-  Terminal,
-  GitBranch,
-  Plus,
-  Download,
-  Menu,
-  XCircle,
+  MessageSquare,
+  Megaphone,
+  Sparkles,
   Rocket,
   Search,
   Code2,
-  CheckCircle2,
-  BarChart3,
-  MessageSquare,
-  Megaphone,
-  Sparkles
+  CheckCircle2
 } from 'lucide-react';
 
 function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('ideation');
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [activeJourneyStep, setActiveJourneyStep] = useState(0);
 
   const journeySteps = [
@@ -143,6 +130,10 @@ function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const handleRedirectToChat = () => {
+    window.location.href = `${window.location.origin}/chat`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       {/* Header */}
@@ -153,24 +144,12 @@ function App() {
               <Blocks className="w-8 h-8 text-blue-600" />
               <span className="font-bold text-2xl text-blue-600">SmartAI</span>
             </div>
-
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setIsWalletConnected(!isWalletConnected)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isWalletConnected
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                }`}
-              >
-                <Wallet className="w-4 h-4" />
-                {isWalletConnected ? 'Connected' : 'Connect Wallet'}
-              </button>
-
-              <button className="p-2 rounded-lg hover:bg-gray-100">
-                <Settings className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
+            <button
+              onClick={handleRedirectToChat}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Open Platform
+            </button>
           </div>
         </div>
       </header>
@@ -187,10 +166,16 @@ function App() {
               From ideation to deployment, SmartAI helps you create, develop, and launch your business with confidence.
             </p>
             <div className="flex justify-center gap-4">
-              <button className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+              <button
+                onClick={handleRedirectToChat}
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
                 Get Started
               </button>
-              <button className="px-6 py-3 bg-white text-blue-600 rounded-lg font-medium hover:bg-gray-50 transition-colors border border-blue-200">
+              <button
+                onClick={handleRedirectToChat}
+                className="px-6 py-3 bg-white text-blue-600 rounded-lg font-medium hover:bg-gray-50 transition-colors border border-blue-200"
+              >
                 Watch Demo
               </button>
             </div>
@@ -275,7 +260,10 @@ function App() {
           <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
             Join thousands of entrepreneurs who are building their dreams with SmartAI.
           </p>
-          <button className="px-8 py-3 bg-white text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors">
+          <button
+            onClick={handleRedirectToChat}
+            className="px-8 py-3 bg-white text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors"
+          >
             Start Building Now
           </button>
         </div>
@@ -295,27 +283,71 @@ function App() {
             <div>
               <h4 className="text-white font-medium mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
-                <li>Features</li>
-                <li>Pricing</li>
-                <li>Documentation</li>
-                <li>API</li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Features
+                  </button>
+                </li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Pricing
+                  </button>
+                </li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Documentation
+                  </button>
+                </li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    API
+                  </button>
+                </li>
               </ul>
             </div>
             <div>
               <h4 className="text-white font-medium mb-4">Company</h4>
               <ul className="space-y-2 text-sm">
-                <li>About</li>
-                <li>Blog</li>
-                <li>Careers</li>
-                <li>Contact</li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    About
+                  </button>
+                </li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Blog
+                  </button>
+                </li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Careers
+                  </button>
+                </li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Contact
+                  </button>
+                </li>
               </ul>
             </div>
             <div>
               <h4 className="text-white font-medium mb-4">Legal</h4>
               <ul className="space-y-2 text-sm">
-                <li>Privacy</li>
-                <li>Terms</li>
-                <li>Security</li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Privacy
+                  </button>
+                </li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Terms
+                  </button>
+                </li>
+                <li>
+                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                    Security
+                  </button>
+                </li>
               </ul>
             </div>
           </div>
