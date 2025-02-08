@@ -1,25 +1,26 @@
 "use client";
-import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { modalContent } from '@/data/modalContent';
+import { modalContent, ModalContentMap } from '@/data/modalContent';
 import {
   Blocks,
-  Brain,
-  Shield,
   Bot,
-  MessageSquare,
+  Brain,
+  CheckCircle2,
+  Code2,
   Megaphone,
-  Sparkles,
+  MessageSquare,
   Rocket,
   Search,
-  Code2,
-  CheckCircle2
+  Shield,
+  Sparkles
 } from 'lucide-react';
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 
 function Home() {
   const [activeJourneyStep, setActiveJourneyStep] = useState(0);
@@ -127,9 +128,10 @@ function Home() {
 
     switch (activeModal) {
       case 'features':
+        const featuresContent = content as ModalContentMap['features'];
         return (
           <div className="space-y-8">
-            {content.content.map((feature, idx) => (
+            {featuresContent.content.map((feature, idx) => (
               <div key={idx} className="space-y-4">
                 <h3 className="text-lg font-semibold text-blue-600">{feature.title}</h3>
                 <p className="text-gray-600">{feature.description}</p>
@@ -144,9 +146,10 @@ function Home() {
         );
 
       case 'pricing':
+        const pricingContent = content as ModalContentMap['pricing'];
         return (
           <div className="grid md:grid-cols-3 gap-6">
-            {content.plans.map((plan, idx) => (
+            {pricingContent.plans.map((plan, idx) => (
               <div key={idx} className="border rounded-lg p-6 space-y-4">
                 <h3 className="text-xl font-bold">{plan.name}</h3>
                 <p className="text-2xl font-bold text-blue-600">{plan.price}</p>
@@ -169,10 +172,11 @@ function Home() {
           </div>
         );
 
-      case 'about':
+      case 'about': {
+        const aboutContent = content as ModalContentMap['about'];
         return (
           <div className="space-y-8">
-            {content.sections.map((section, idx) => (
+            {aboutContent.sections.map((section, idx) => (
               <div key={idx} className="space-y-2">
                 <h3 className="text-lg font-semibold text-blue-600">{section.title}</h3>
                 <p className="text-gray-700 leading-relaxed">{section.content}</p>
@@ -180,11 +184,13 @@ function Home() {
             ))}
           </div>
         );
+      }
 
-      case 'documentation':
+      case 'documentation': {
+        const documentationContent = content as ModalContentMap['documentation'];
         return (
           <div className="space-y-6">
-            {content.sections.map((section, idx) => (
+            {documentationContent.sections.map((section, idx) => (
               <div key={idx} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                 <h3 className="text-lg font-semibold mb-2">{section.title}</h3>
                 <p className="text-gray-600">{section.content}</p>
@@ -200,6 +206,7 @@ function Home() {
             </div>
           </div>
         );
+      }
 
       default:
         return null;
@@ -289,9 +296,11 @@ function Home() {
                 }`}
               >
                 <div className={`flex-1 ${index % 2 === 0 ? 'lg:order-1' : 'lg:order-2'}`}>
-                  <img
+                  <Image
                     src={step.image}
                     alt={step.title}
+                    width={800}
+                    height={600}
                     className="rounded-xl shadow-lg w-full h-[400px] object-cover"
                   />
                 </div>

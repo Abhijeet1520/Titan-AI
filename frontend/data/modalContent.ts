@@ -1,4 +1,45 @@
-export const modalContent = {
+export type ModalFeatures = {
+  title: string;
+  content: {
+    title: string;
+    description: string;
+    points: string[];
+  }[];
+};
+
+export type ModalPricing = {
+  title: string;
+  plans: {
+    name: string;
+    price: string;
+    features: string[];
+  }[];
+};
+
+export type ModalAbout = {
+  title: string;
+  sections: {
+    title: string;
+    content: string;
+  }[];
+};
+
+export type ModalDocumentation = {
+  title: string;
+  sections: {
+    title: string;
+    content: string;
+  }[];
+};
+
+export interface ModalContentMap {
+  features: ModalFeatures;
+  pricing: ModalPricing;
+  about: ModalAbout;
+  documentation: ModalDocumentation;
+}
+
+export const modalContent: ModalContentMap = {
     features: {
       title: "Platform Features",
       content: [

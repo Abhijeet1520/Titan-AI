@@ -1,31 +1,28 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import SplitPane, { Pane } from 'react-split-pane';
 import Editor from "@monaco-editor/react";
 import {
-  Send,
-  Bot,
-  FileCode,
-  Shield,
-  Zap,
-  Blocks,
-  Wallet,
-  Brain,
-  Layout,
-  ChevronDown,
-  Settings,
-  Terminal,
-  Database,
-  GitBranch,
-  Plus,
-  Trash2,
-  Download,
-  Menu,
-  XCircle,
   AlertCircle,
+  Blocks,
+  Bot,
+  Brain,
   CheckCircle2,
-  Clock
+  Clock,
+  Database,
+  Download,
+  FileCode,
+  GitBranch,
+  Layout,
+  Plus,
+  Send,
+  Settings,
+  Shield,
+  Terminal,
+  Trash2,
+  Wallet,
+  Zap
 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import SplitPane from 'react-split-pane';
 
 /* -------------------------------------------------------------------
   TYPES & INTERFACES
@@ -300,8 +297,8 @@ function Home() {
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('requirements');
 
   /* ------------------------------------------------------------------
-       useEffect: Initialize with an example project (DeFi)
-  ---------------------------------------------------------------------*/
+       generateContract: Create mock contract & populate editor
+  --------------------------------------------------------------------*/
   useEffect(() => {
     const defaultReqs = [
       "Users can stake multiple token types for yield",
@@ -312,8 +309,6 @@ function Home() {
     ];
     setRequirements(defaultReqs);
 
-    // Generate an initial contract
-    generateContract(defaultReqs);
   }, []);
 
   /* ------------------------------------------------------------------
@@ -373,7 +368,7 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
     IERC20 public stakeTokenA;
     IERC20 public stakeTokenB;
     IERC20 public governanceToken;
-    
+
     struct UserInfo {
         uint256 amountA;
         uint256 amountB;
@@ -386,12 +381,12 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
     uint256 public penaltyPeriod = 7 days;
     uint256 public penaltyFee = 10;
     uint256 public constant PRECISION = 1e18;
-    
+
     event Staked(address indexed user, address token, uint256 amount);
     event Withdrawn(address indexed user, address token, uint256 amount, uint256 penalty);
     event RewardsClaimed(address indexed user, uint256 amount);
     event PenaltyUpdated(uint256 oldFee, uint256 newFee);
-    
+
     constructor(
         address _tokenA,
         address _tokenB,
@@ -401,7 +396,7 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
         require(_tokenA != address(0), "Invalid token A address");
         require(_tokenB != address(0), "Invalid token B address");
         require(_govToken != address(0), "Invalid governance token address");
-        
+
         stakeTokenA = IERC20(_tokenA);
         stakeTokenB = IERC20(_tokenB);
         governanceToken = IERC20(_govToken);
@@ -416,11 +411,11 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
         _;
     }
 
-    function stake(address token, uint256 amount) 
-        external 
-        nonReentrant 
+    function stake(address token, uint256 amount)
+        external
+        nonReentrant
         validateToken(token)
-        whenNotPaused 
+        whenNotPaused
     {
         require(amount > 0, "Cannot stake zero tokens");
         UserInfo storage user = userInfo[msg.sender];
@@ -437,11 +432,11 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
         emit Staked(msg.sender, token, amount);
     }
 
-    function withdraw(address token, uint256 amount) 
-        external 
-        nonReentrant 
+    function withdraw(address token, uint256 amount)
+        external
+        nonReentrant
         validateToken(token)
-        whenNotPaused 
+        whenNotPaused
     {
         UserInfo storage user = userInfo[msg.sender];
         require(
@@ -457,12 +452,12 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
 
         uint256 penalty = _calculatePenalty(user, amount);
         uint256 finalAmount = amount - penalty;
-        
+
         IERC20(token).transfer(msg.sender, finalAmount);
         if (penalty > 0) {
             IERC20(token).transfer(address(this), penalty);
         }
-        
+
         emit Withdrawn(msg.sender, token, amount, penalty);
     }
 
@@ -470,22 +465,22 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
         UserInfo storage user = userInfo[msg.sender];
         uint256 pending = _calculateRewards(msg.sender);
         require(pending > 0, "No rewards to claim");
-        
+
         user.rewardDebt = block.timestamp;
         rewardPool -= pending;
-        
+
         require(
             governanceToken.transfer(msg.sender, pending),
             "Reward transfer failed"
         );
-        
+
         emit RewardsClaimed(msg.sender, pending);
     }
 
-    function _calculatePenalty(UserInfo memory user, uint256 amount) 
-        internal 
-        view 
-        returns (uint256) 
+    function _calculatePenalty(UserInfo memory user, uint256 amount)
+        internal
+        view
+        returns (uint256)
     {
         if (block.timestamp < user.lastStakeTime + penaltyPeriod) {
             return (amount * penaltyFee) / 100;
@@ -497,9 +492,9 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
         UserInfo memory userInfo = userInfo[_user];
         uint256 timeElapsed = block.timestamp - userInfo.rewardDebt;
         uint256 totalStaked = userInfo.amountA + userInfo.amountB;
-        
+
         if (timeElapsed == 0 || totalStaked == 0) return 0;
-        
+
         return (totalStaked * timeElapsed * PRECISION) / (7 days);
     }
 
@@ -510,7 +505,7 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
             "Insufficient governance tokens"
         );
         require(newFee <= 20, "Fee too high");
-        
+
         emit PenaltyUpdated(penaltyFee, newFee);
         penaltyFee = newFee;
     }
@@ -527,16 +522,16 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
     function emergencyWithdraw(address token) external nonReentrant {
         require(paused(), "Protocol must be paused");
         UserInfo storage user = userInfo[msg.sender];
-        
+
         uint256 amount = token == address(stakeTokenA) ? user.amountA : user.amountB;
         require(amount > 0, "No tokens to withdraw");
-        
+
         if (token == address(stakeTokenA)) {
             user.amountA = 0;
         } else {
             user.amountB = 0;
         }
-        
+
         IERC20(token).transfer(msg.sender, amount);
         emit Withdrawn(msg.sender, token, amount, 0);
     }
@@ -591,18 +586,18 @@ Pending security audit. Key areas to review:
 module.exports = {
   // Network selection
   network: "goerli",
-  
+
   // Contract addresses
   tokenA: "0xTokenA...",  // Staking token A
   tokenB: "0xTokenB...",  // Staking token B
   govToken: "0xGov...",   // Governance token
-  
+
   // Initial parameters
   initialRewards: "1000000000000000000000", // 1,000 tokens (18 decimals)
-  
+
   // Verification settings
   verify: true,
-  
+
   // Constructor arguments
   constructorArgs: [
     "0xTokenA...",
@@ -610,7 +605,7 @@ module.exports = {
     "0xGov...",
     "1000000000000000000000"
   ],
-  
+
   // Gas settings
   gasPrice: "auto",
   gasLimit: 5000000
@@ -818,6 +813,7 @@ module.exports = {
       </div>
 
       {/* Main Split: Left (Chat) | Right (Editor + Bottom Tabs) */}
+      {/* @ts-ignore */}
       <SplitPane
         split="vertical"
         defaultSize="60%"
@@ -958,7 +954,7 @@ module.exports = {
                 type="submit"
                 disabled={isProcessing}
                 className={`bg-blue-500 text-white p-2.5 rounded-xl transition-colors ${
-                  isProcessing 
+                  isProcessing
                     ? 'opacity-75 cursor-not-allowed'
                     : 'hover:bg-blue-600'
                 }`}
@@ -970,6 +966,7 @@ module.exports = {
         </div>
 
         {/* RIGHT: Split horizontally => Top (Editor), Bottom (Tabs) */}
+        {/* @ts-ignore */}
         <SplitPane
           split="horizontal"
           defaultSize="60%"
