@@ -241,7 +241,7 @@ function Home() {
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center gap-2">
               <Blocks className="w-8 h-8 text-blue-600" />
-              <span className="font-bold text-2xl text-blue-600">SmartAI</span>
+              <span className="font-bold text-2xl text-blue-600">Titan AI</span>
             </div>
             <button
               onClick={handleRedirectToChat}
@@ -262,7 +262,7 @@ function Home() {
               <span className="text-blue-600"> AI</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              From ideation to deployment, SmartAI helps you create, develop, and launch your business with confidence.
+              From ideation to deployment, Titan AI helps you create, develop, and launch your business with confidence.
             </p>
             <div className="flex justify-center gap-4">
               <button
@@ -285,7 +285,7 @@ function Home() {
       {/* Journey Section */}
       <div id="journey-section" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-bold text-center mb-16">Your Journey with SmartAI</h2>
+          <h2 className="text-3xl font-bold text-center mb-16">Your Journey with Titan AI</h2>
 
           <div className="space-y-32">
             {journeySteps.map((step, index) => (
@@ -333,7 +333,7 @@ function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-bold text-center mb-4">Compatible with Leading LLMs</h2>
           <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            SmartAI seamlessly integrates with major language models and supports custom implementations for specialized needs.
+            Titan AI seamlessly integrates with major language models and supports custom implementations for specialized needs.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -359,7 +359,7 @@ function Home() {
             Ready to Start Your Journey?
           </h2>
           <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
-            Join thousands of entrepreneurs who are building their dreams with SmartAI.
+            Join thousands of entrepreneurs who are building their dreams with Titan AI.
           </p>
           <button
             onClick={handleRedirectToChat}
@@ -377,7 +377,7 @@ function Home() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <Blocks className="w-6 h-6 text-blue-400" />
-                <span className="font-bold text-white">SmartAI</span>
+                <span className="font-bold text-white">Titan AI</span>
               </div>
               <p className="text-sm">Building the future of business development with AI.</p>
             </div>
@@ -465,7 +465,7 @@ function Home() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-12 pt-8 text-sm text-center">
-            © 2025 SmartAI. Created by <a href="https://abhi1520.com">Abhijeet1520</a>. All rights reserved.
+            © 2025 Titan AI. Created by <a href="https://abhi1520.com">Abhijeet1520</a>. All rights reserved.
           </div>
         </div>
       </footer>

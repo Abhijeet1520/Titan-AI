@@ -755,7 +755,7 @@ module.exports = {
       <div className="w-full h-14 flex items-center justify-between bg-white border-b px-4">
         <div className="flex items-center gap-3">
           <Blocks className="w-6 h-6 text-blue-600" />
-          <span className="font-bold text-xl text-blue-600">SmartAI</span>
+          <span className="font-bold text-xl text-blue-600">Titan AI</span>
 
           {/* Project selection (Optional) */}
           <select

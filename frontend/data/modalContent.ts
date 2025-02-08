@@ -113,7 +113,7 @@ export const modalContent: ModalContentMap = {
       ]
     },
     about: {
-      title: "About Aurora AI",
+      title: "About Titan AI",
       sections: [
         {
           title: "Our Mission",
