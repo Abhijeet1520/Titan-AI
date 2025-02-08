@@ -27,24 +27,65 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-//---------------------------------------------
-//  In-memory session store & queue
-//---------------------------------------------
+//-------------------------------------------------------
+// Specialized Prompts: Read from env variables or default
+//-------------------------------------------------------
+const PROMPT_REQUIREMENTS =
+  process.env.REQUIREMENTS_PROMPT ||
+  `
+The user wants to discuss new requirements. Provide helpful detail about how to gather requirements,
+security considerations, and objectives. Also list some clarifying questions.
+`.trim();
+
+const PROMPT_RESEARCH =
+  process.env.RESEARCH_PROMPT ||
+  `
+The user wants to research or analyze something. Provide thorough background research,
+competitor analysis, or relevant data.
+`.trim();
+
+const PROMPT_DEVELOPMENT =
+  process.env.DEVELOPMENT_PROMPT ||
+  `
+The user wants to discuss development. Provide guidance on best practices, tools, and frameworks.
+`.trim();
+
+const PROMPT_AUDIT =
+  process.env.AUDIT_PROMPT ||
+  `
+The user wants to discuss auditing. Provide guidance on security audits, code reviews, and testing.
+`.trim();
+
+const PROMPT_DEPLOYMENT =
+  process.env.DEPLOYMENT_PROMPT ||
+  `
+The user wants to discuss deployment. Provide guidance on deployment strategies, hosting, and scaling.
+`.trim();
+
+const PROMPT_GENERAL =
+  process.env.GENERAL_PROMPT ||
+  `
+The user has a general question. Provide a helpful response.
+`.trim();
+
+//-------------------------------------------------------
+// In-memory session store & queue
+//-------------------------------------------------------
 interface AgentSession {
   agent: ReturnType<typeof createReactAgent>;
   agentConfig: Record<string, any>;
-  lastActive: number;         // Timestamp of last user activity
-  inactivityTimer: NodeJS.Timeout;  // Timer handle to clean up if inactive
+  lastActive: number; // Timestamp of last user activity
+  inactivityTimer: NodeJS.Timeout; // Timer handle to clean up if inactive
 }
 
 const SESSIONS: Record<string, AgentSession> = {};
 const MAX_ACTIVE_SESSIONS = 20;
-const SESSION_INACTIVITY_MS = 10 * 60 * 1000; // 10 min
+const SESSION_INACTIVITY_MS = 10 * 60 * 1000; // 10 minutes
 const QUEUE: Array<{ chatId: string }> = [];
 
-//---------------------------------------------
-//  Wallet data location
-//---------------------------------------------
+//-------------------------------------------------------
+// Wallet data location
+//-------------------------------------------------------
 const WALLET_DATA_FILE = path.join(__dirname, "wallet_data.txt");
 
 /***************************************************
@@ -214,7 +255,7 @@ app.post("/api/start-chat", async (req, res) => {
     if (activeCount >= MAX_ACTIVE_SESSIONS) {
       console.log(`Active sessions = ${activeCount}, pushing chat [${chatId}] to queue.`);
       QUEUE.push({ chatId });
-      return res.json({ message: `Queue is full (50). Your request has been queued.` });
+      return res.json({ message: `Queue is full (${MAX_ACTIVE_SESSIONS}). Your request has been queued.` });
     }
 
     // Otherwise, create a new agent session
@@ -266,7 +307,6 @@ app.post("/api/chat", async (req, res) => {
     resetInactivityTimer(chatId);
 
     // 1) Classify the user's message
-    //    We'll do a mini classification step with the agent. We can do a more advanced approach if you prefer.
     const classificationPrompt = `
       You will read the user's message and classify it into one of the following modes:
       "requirements", "research", "development", "audit", "deployment", "general".
@@ -288,38 +328,21 @@ app.post("/api/chat", async (req, res) => {
     const allowedModes = ["requirements", "research", "development", "audit", "deployment", "general"];
     const mode = allowedModes.includes(rawMode) ? rawMode : "general";
 
-    // 2) Construct a "specialized" prompt if desired (the user mentioned “some questions for the user”).
-    //    You can tailor this any way you like, for example:
-    let specializedPrompt = userMessage;
+    // 2) Build the specialized prompt based on the classification
+    let specializedPrompt = "";
     if (mode === "requirements") {
-      // If the user wants to create a DeFi protocol, we might ask clarifying Q's
-      specializedPrompt = `
-        The user wants to discuss new requirements. Provide helpful detail about how to gather requirements,
-        security considerations, and objectives. Also list some clarifying questions.
-      `;
+      specializedPrompt = PROMPT_REQUIREMENTS;
     } else if (mode === "research") {
-      specializedPrompt = `
-        The user wants to research or analyze something. Provide thorough background research,
-        competitor analysis, or relevant data.
-      `;
+      specializedPrompt = PROMPT_RESEARCH;
     } else if (mode === "development") {
-      specializedPrompt = `
-        The user wants to discuss development. Provide guidance on best practices, tools, and frameworks.
-      `;
+      specializedPrompt = PROMPT_DEVELOPMENT;
     } else if (mode === "audit") {
-      specializedPrompt = `
-        The user wants to discuss auditing. Provide guidance on security audits, code reviews, and testing.
-      `;
+      specializedPrompt = PROMPT_AUDIT;
     } else if (mode === "deployment") {
-      specializedPrompt = `
-        The user wants to discuss deployment. Provide guidance on deployment strategies, hosting, and scaling.
-      `;
+      specializedPrompt = PROMPT_DEPLOYMENT;
     } else {
-      specializedPrompt = `
-        The user has a general question. Provide a helpful response.
-      `;
+      specializedPrompt = PROMPT_GENERAL;
     }
-
     specializedPrompt += ` User message: "${userMessage}"`;
 
     // 3) Send the specialized prompt to the agent
@@ -328,13 +351,11 @@ app.post("/api/chat", async (req, res) => {
       session.agentConfig
     );
 
-    // 4) Collect the agent's final text
     let finalText = "";
     for await (const chunk of agentStream) {
       if ("agent" in chunk) {
         finalText += chunk.agent.messages[0].content + "\n";
       } else if ("tools" in chunk) {
-        // If you want to display tool usage logs, you can capture that here
         finalText += `(TOOL-LOG) ${chunk.tools.messages[0].content}\n`;
       }
     }
@@ -352,12 +373,10 @@ app.post("/api/chat", async (req, res) => {
 
 /***************************************************
  * Endpoint: Manual check if any queued requests
- * (Example only. You might handle queue differently.)
  ***************************************************/
 app.get("/api/queue-status", (req, res) => {
   res.json({ queued: QUEUE });
 });
-
 
 /***************************************************
  * Endpoint: Manual check if any active sessions
@@ -367,8 +386,7 @@ app.get("/api/session-status", (req, res) => {
 });
 
 /***************************************************
- * Endpoint: Show the server is running
- * (Useful for health checks)
+ * Endpoint: Show the server is running (Health Check)
  ***************************************************/
 app.get("/", (req, res) => {
   res.send("Server is running.");
