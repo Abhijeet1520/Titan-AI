@@ -235,6 +235,105 @@ app.post("/api/auto", async (req, res) => {
 });
 
 /***************************************************
+ * Advanced Chat endpoint
+ * This endpoint first sends a prompt to the agent to determine
+ * the query type (e.g. requirements, research, development,
+ * audit, deployment, or general). Based on the response and
+ * optionally a conversationStatus flag, it then calls the
+ * appropriate specialized prompt(s).
+ ***************************************************/
+app.post("/api/advanced-chat", async (req, res) => {
+  try {
+    if (!globalAgent || !globalAgentConfig) {
+      return res.status(400).json({ error: "Agent not initialized." });
+    }
+
+    const { userMessage, conversationStatus } = req.body;
+    if (!userMessage) {
+      return res.status(400).json({ error: "Missing 'userMessage' in request body." });
+    }
+
+    // If this is a new conversation, run the full sequence.
+    let prompts: { type: string; prompt: string }[] = [];
+    if (conversationStatus === "new") {
+      prompts = [
+        {
+          type: "requirements",
+          prompt: "Please provide the detailed project requirements including functionality, security needs, and business objectives."
+        },
+        {
+          type: "research",
+          prompt: "Based on the requirements, provide an in-depth market analysis and competitive research."
+        },
+        {
+          type: "development",
+          prompt: "List the current files (or file placeholders) and provide initial smart contract code to kickstart development."
+        },
+        {
+          type: "audit",
+          prompt: "Perform a security audit on the provided code and list any potential vulnerabilities."
+        },
+        {
+          type: "deployment",
+          prompt: "Outline a step-by-step deployment plan, including network configuration and verification steps."
+        }
+      ];
+    } else {
+      // For ongoing conversations, first ask the agent to classify the query.
+      const classificationPrompt = `Please determine the category of the following query. Respond with one word from the following options: requirements, research, development, audit, deployment, or general. Query: "${userMessage}"`;
+      const classificationStream = await globalAgent.stream(
+        { messages: [new HumanMessage(classificationPrompt)] },
+        globalAgentConfig
+      );
+      let classificationResponse = "";
+      for await (const chunk of classificationStream) {
+        if ("agent" in chunk) {
+          classificationResponse += chunk.agent.messages[0].content;
+        }
+      }
+      const category = classificationResponse.trim().toLowerCase();
+      const allowedCategories = ["requirements", "research", "development", "audit", "deployment", "general"];
+      const queryCategory = allowedCategories.includes(category) ? category : "general";
+
+      // Define specialized prompts for each category.
+      const specializedPrompts: Record<string, string> = {
+        requirements: "Please provide the detailed project requirements including functionality, security needs, and business objectives.",
+        research: "Based on the requirements, provide an in-depth market analysis and competitive research.",
+        development: "List the current files and provide initial smart contract code to kickstart development.",
+        audit: "Perform a security audit on the provided code and list any potential vulnerabilities.",
+        deployment: "Outline a step-by-step deployment plan, including network configuration and verification steps.",
+        general: userMessage
+      };
+
+      prompts.push({ type: queryCategory, prompt: specializedPrompts[queryCategory] });
+    }
+
+    let fullResponse = "";
+    // For each selected prompt, call the agent and accumulate responses.
+    for (const p of prompts) {
+      const agentStream = await globalAgent.stream(
+        { messages: [new HumanMessage(p.prompt)] },
+        globalAgentConfig
+      );
+      let collectedResponse = "";
+      for await (const chunk of agentStream) {
+        if ("agent" in chunk) {
+          collectedResponse += chunk.agent.messages[0].content + "\n";
+        } else if ("tools" in chunk) {
+          collectedResponse += `[TOOL LOG] ${chunk.tools.messages[0].content}\n`;
+        }
+      }
+      fullResponse += `--- ${p.type.toUpperCase()} RESPONSE ---\n` + collectedResponse + "\n";
+    }
+
+    return res.json({ response: fullResponse.trim() });
+  } catch (error) {
+    console.error("Error in /api/advanced-chat:", error);
+    return res.status(500).json({ error: String(error) });
+  }
+});
+
+/***************************************************
  * Agent initialization endpoint
  ***************************************************/
 app.post("/api/initialize", async (req, res) => {
