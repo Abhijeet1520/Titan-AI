@@ -1023,46 +1023,13 @@ module.exports = {
         <SplitPane
           split="horizontal"
           defaultSize="60%"
+          className="h-full w-full"
           minSize="10%"
           maxSize="90%"
           resizerStyle={horizontalResizerStyle}
         >
-          {/* TOP: Editor Panel */}
-          <div className="w-full h-full flex flex-col overflow-y-auto overflow-x-hidden">
-            <div className="flex items-center justify-between p-3 border-b bg-white">
-              <div className="flex items-center gap-3">
-                <FileCode className="w-4 h-4 text-gray-500" />
-                <h2 className="font-semibold text-gray-800">
-                  Smart Contract Editor
-                </h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDownloadContract}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                  title="Download Contract"
-                >
-                  <Download className="w-4 h-4 text-gray-600" />
-                </button>
-                <button
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                  title="Toggle Fullscreen"
-                >
-                  <Blocks className="w-4 h-4 text-gray-600" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1">
-              <MultiFileEditor
-                files={files}
-                setFiles={setFiles}
-                isFullscreen={isFullscreen}
-              />
-            </div>
-          </div>
 
-          {/* BOTTOM: TABS (Requirements, Research, Audit, Deployment) */}
+          {/* TOP: TABS (Requirements, Research, Audit, Deployment) */}
           <div className="w-full h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden">
             {/* Tab Bar */}
             <div className="flex items-center gap-2 border-b px-3 bg-gray-50">
@@ -1337,6 +1304,40 @@ module.exports = {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+          {/* BOTTOM: Editor Panel */}
+          <div className="w-full h-full flex flex-col overflow-y-auto overflow-x-hidden">
+            <div className="flex items-center justify-between p-3 border-b bg-white">
+              <div className="flex items-center gap-3">
+                <FileCode className="w-4 h-4 text-gray-500" />
+                <h2 className="font-semibold text-gray-800">
+                  Smart Contract Editor
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadContract}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Download Contract"
+                >
+                  <Download className="w-4 h-4 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Toggle Fullscreen"
+                >
+                  <Blocks className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1">
+              <MultiFileEditor
+                files={files}
+                setFiles={setFiles}
+                isFullscreen={isFullscreen}
+              />
             </div>
           </div>
         </SplitPane>
