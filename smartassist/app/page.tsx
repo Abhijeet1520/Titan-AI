@@ -1,11 +1,16 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { modalContent } from '@/data/modalContent';
+import {
   Blocks,
   Brain,
-  FileCode,
   Shield,
-  Zap,
   Bot,
   MessageSquare,
   Megaphone,
@@ -16,8 +21,9 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
-function App() {
+function Home() {
   const [activeJourneyStep, setActiveJourneyStep] = useState(0);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const journeySteps = [
     {
@@ -110,6 +116,96 @@ function App() {
     }
   ];
 
+  const handleRedirectToChat = () => {
+    window.location.href = `${window.location.origin}/chat`;
+  };
+
+  const renderModalContent = () => {
+    if (!activeModal) return null;
+
+    const content = modalContent[activeModal as keyof typeof modalContent];
+
+    switch (activeModal) {
+      case 'features':
+        return (
+          <div className="space-y-8">
+            {content.content.map((feature, idx) => (
+              <div key={idx} className="space-y-4">
+                <h3 className="text-lg font-semibold text-blue-600">{feature.title}</h3>
+                <p className="text-gray-600">{feature.description}</p>
+                <ul className="list-disc list-inside space-y-2">
+                  {feature.points.map((point, i) => (
+                    <li key={i} className="text-gray-700">{point}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'pricing':
+        return (
+          <div className="grid md:grid-cols-3 gap-6">
+            {content.plans.map((plan, idx) => (
+              <div key={idx} className="border rounded-lg p-6 space-y-4">
+                <h3 className="text-xl font-bold">{plan.name}</h3>
+                <p className="text-2xl font-bold text-blue-600">{plan.price}</p>
+                <ul className="space-y-2">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={handleRedirectToChat}
+                  className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Get Started
+                </button>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'about':
+        return (
+          <div className="space-y-8">
+            {content.sections.map((section, idx) => (
+              <div key={idx} className="space-y-2">
+                <h3 className="text-lg font-semibold text-blue-600">{section.title}</h3>
+                <p className="text-gray-700 leading-relaxed">{section.content}</p>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'documentation':
+        return (
+          <div className="space-y-6">
+            {content.sections.map((section, idx) => (
+              <div key={idx} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                <h3 className="text-lg font-semibold mb-2">{section.title}</h3>
+                <p className="text-gray-600">{section.content}</p>
+              </div>
+            ))}
+            <div className="mt-6">
+              <button
+                onClick={handleRedirectToChat}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Open Documentation
+              </button>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   useEffect(() => {
     const handleScroll = () => {
       const journeySection = document.getElementById('journey-section');
@@ -129,10 +225,6 @@ function App() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  const handleRedirectToChat = () => {
-    window.location.href = `${window.location.origin}/chat`;
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -284,17 +376,26 @@ function App() {
               <h4 className="text-white font-medium mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                  <button
+                    onClick={() => setActiveModal('features')}
+                    className="hover:text-blue-400 transition-colors"
+                  >
                     Features
                   </button>
                 </li>
                 <li>
-                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                  <button
+                    onClick={() => setActiveModal('pricing')}
+                    className="hover:text-blue-400 transition-colors"
+                  >
                     Pricing
                   </button>
                 </li>
                 <li>
-                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                  <button
+                    onClick={() => setActiveModal('documentation')}
+                    className="hover:text-blue-400 transition-colors"
+                  >
                     Documentation
                   </button>
                 </li>
@@ -309,7 +410,10 @@ function App() {
               <h4 className="text-white font-medium mb-4">Company</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <button onClick={handleRedirectToChat} className="hover:text-blue-400 transition-colors">
+                  <button
+                    onClick={() => setActiveModal('about')}
+                    className="hover:text-blue-400 transition-colors"
+                  >
                     About
                   </button>
                 </li>
@@ -352,12 +456,23 @@ function App() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-12 pt-8 text-sm text-center">
-            © 2025 SmartAI. All rights reserved.
+            © 2025 SmartAI. Created by <a href="https://abhi1520.com">Abhijeet1520</a>. All rights reserved.
           </div>
         </div>
       </footer>
+
+      <Dialog open={activeModal !== null} onOpenChange={() => setActiveModal(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {activeModal ? modalContent[activeModal as keyof typeof modalContent].title : ''}
+            </DialogTitle>
+          </DialogHeader>
+          {renderModalContent()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-export default App;
+export default Home;
