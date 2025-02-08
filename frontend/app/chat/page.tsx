@@ -25,6 +25,12 @@ import React, { useEffect, useState } from "react";
 import SplitPane from "react-split-pane";
 import Image from "next/image";
 
+import { agentsData } from "@/data/agents";
+import { projectTypesData } from "@/data/projectTypes";
+import { chatModelsData } from "@/data/chatModels";
+import { defaultRequirements } from "@/data/defaultRequirements";
+import { bigDefiContract, readmeContent, deployConfig } from "@/data/contractTemplates";
+
 /* -------------------------------------------------------------------
   TYPES & INTERFACES
 ---------------------------------------------------------------------*/
@@ -38,23 +44,6 @@ interface Message {
   securityChecks?: string[];
   aiSuggestions?: string[];
   status?: "pending" | "complete" | "error";
-}
-
-interface Agent {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  expertise: string[];
-}
-
-interface ProjectType {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  features: string[];
-  complexity: "Low" | "Medium" | "High";
 }
 
 interface CodeFile {
@@ -191,114 +180,13 @@ function Home() {
   const [walletAddress, setWalletAddress] = useState("0x1234...5678");
 
   // Agents (multiple)
-  const agents: Agent[] = [
-    {
-      id: "research",
-      name: "Research Agent",
-      description: "Provides domain/market research & suggestions",
-      icon: <Brain className="w-5 h-5" />,
-      expertise: [
-        "Market Analysis",
-        "Competitor Research",
-        "Trend Analysis",
-        "Risk Assessment"
-      ]
-    },
-    {
-      id: "developer",
-      name: "Developer Agent",
-      description: "Implements the contract logic",
-      icon: <Terminal className="w-5 h-5" />,
-      expertise: ["Smart Contracts", "Gas Optimization", "Testing", "Integration"]
-    },
-    {
-      id: "auditor",
-      name: "Auditor Agent",
-      description: "Analyzes and audits the contract for vulnerabilities",
-      icon: <Shield className="w-5 h-5" />,
-      expertise: [
-        "Security Analysis",
-        "Best Practices",
-        "Vulnerability Detection",
-        "Code Review"
-      ]
-    },
-    {
-      id: "deployment",
-      name: "Deployment Specialist",
-      description: "Handles final deployment & verification steps",
-      icon: <GitBranch className="w-5 h-5" />,
-      expertise: [
-        "Network Selection",
-        "Contract Verification",
-        "Gas Estimation",
-        "Deployment Strategy"
-      ]
-    }
-  ];
+  const agents = agentsData;
 
   // Project types
-  const projectTypes: ProjectType[] = [
-    {
-      id: "defi",
-      name: "DeFi Protocol",
-      description: "Medium-High complexity staking or yield strategies",
-      icon: <Database className="w-5 h-5" />,
-      features: [
-        "Multi-token Support",
-        "Yield Optimization",
-        "Flash Loans",
-        "Governance"
-      ],
-      complexity: "High"
-    },
-    {
-      id: "nft",
-      name: "NFT Platform",
-      description: "Minting, marketplace, and royalties",
-      icon: <FileCode className="w-5 h-5" />,
-      features: ["ERC-721/1155", "Marketplace", "Royalties", "Metadata"],
-      complexity: "Medium"
-    },
-    {
-      id: "dao",
-      name: "DAO Framework",
-      description: "Governance tokens, proposals, and voting",
-      icon: <Layout className="w-5 h-5" />,
-      features: [
-        "Token Voting",
-        "Proposal System",
-        "Treasury Management",
-        "Timelock"
-      ],
-      complexity: "High"
-    }
-  ];
+  const projectTypes = projectTypesData;
 
   // Chat Model selection
-  const chatModels: ChatModel[] = [
-    {
-      id: "gpt-4",
-      name: "OpenAI GPT-4",
-      description: "Advanced reasoning model",
-      features: ["Complex Problem Solving", "Nuanced Understanding", "Code Generation"],
-      costLevel: "High"
-    },
-    {
-      id: "gpt-3.5",
-      name: "OpenAI GPT-3.5",
-      description: "Faster, cost-effective solution",
-      features: ["Quick Responses", "Basic Code Help", "Documentation"],
-      costLevel: "Low"
-    },
-    {
-      id: "custom-llm",
-      name: "Custom LLM",
-      description: "Bring-your-own fine-tuned model",
-      features: ["Specialized Knowledge", "Custom Training", "Private Deployment"],
-      costLevel: "Medium"
-    }
-  ];
+  const chatModels = chatModelsData;
 
   const [selectedAgentId, setSelectedAgentId] = useState<string>("research");
   const [selectedProject, setSelectedProject] = useState("defi");
@@ -336,14 +224,7 @@ function Home() {
        generateContract: Create mock contract & populate editor
   --------------------------------------------------------------------*/
   useEffect(() => {
-    const defaultReqs = [
-      "Users can stake multiple token types for yield",
-      "A reward pool is distributed every 7 days",
-      "Penalties apply if users withdraw before the cycle ends",
-      "Integrate a governance token for fee adjustments",
-      "ReentrancyGuard to protect critical flows"
-    ];
-    setRequirements(defaultReqs);
+    setRequirements(defaultRequirements);
   }, []);
 
   /* ------------------------------------------------------------------
@@ -385,284 +266,31 @@ function Home() {
   --------------------------------------------------------------------*/
   const generateContract = (reqs?: string[]) => {
     const finalReqs = reqs || requirements;
-    const bigDefiContract = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-
-/**
- * @title MyAdvancedDeFi
- * @dev Advanced DeFi protocol with multi-token staking and governance
- * Requirements:
-${finalReqs.map((r, i) => ` * ${i + 1}. ${r}`).join("\n")}
- */
-contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
-    IERC20 public stakeTokenA;
-    IERC20 public stakeTokenB;
-    IERC20 public governanceToken;
-
-    struct UserInfo {
-        uint256 amountA;
-        uint256 amountB;
-        uint256 lastStakeTime;
-        uint256 rewardDebt;
-    }
-
-    mapping(address => UserInfo) public userInfo;
-    uint256 public rewardPool;
-    uint256 public penaltyPeriod = 7 days;
-    uint256 public penaltyFee = 10;
-    uint256 public constant PRECISION = 1e18;
-
-    event Staked(address indexed user, address token, uint256 amount);
-    event Withdrawn(address indexed user, address token, uint256 amount, uint256 penalty);
-    event RewardsClaimed(address indexed user, uint256 amount);
-    event PenaltyUpdated(uint256 oldFee, uint256 newFee);
-
-    constructor(
-        address _tokenA,
-        address _tokenB,
-        address _govToken,
-        uint256 _initialRewards
-    ) {
-        require(_tokenA != address(0), "Invalid token A address");
-        require(_tokenB != address(0), "Invalid token B address");
-        require(_govToken != address(0), "Invalid governance token address");
-
-        stakeTokenA = IERC20(_tokenA);
-        stakeTokenB = IERC20(_tokenB);
-        governanceToken = IERC20(_govToken);
-        rewardPool = _initialRewards;
-    }
-
-    modifier validateToken(address token) {
-        require(
-            token == address(stakeTokenA) || token == address(stakeTokenB),
-            "Unsupported token"
-        );
-        _;
-    }
-
-    function stake(address token, uint256 amount)
-        external
-        nonReentrant
-        validateToken(token)
-        whenNotPaused
-    {
-        require(amount > 0, "Cannot stake zero tokens");
-        UserInfo storage user = userInfo[msg.sender];
-
-        if (token == address(stakeTokenA)) {
-            stakeTokenA.transferFrom(msg.sender, address(this), amount);
-            user.amountA += amount;
-        } else {
-            stakeTokenB.transferFrom(msg.sender, address(this), amount);
-            user.amountB += amount;
-        }
-
-        user.lastStakeTime = block.timestamp;
-        emit Staked(msg.sender, token, amount);
-    }
-
-    function withdraw(address token, uint256 amount)
-        external
-        nonReentrant
-        validateToken(token)
-        whenNotPaused
-    {
-        UserInfo storage user = userInfo[msg.sender];
-        require(
-            token == address(stakeTokenA) ? amount <= user.amountA : amount <= user.amountB,
-            "Insufficient balance"
-        );
-
-        if (token == address(stakeTokenA)) {
-            user.amountA -= amount;
-        } else {
-            user.amountB -= amount;
-        }
-
-        uint256 penalty = _calculatePenalty(user, amount);
-        uint256 finalAmount = amount - penalty;
-
-        IERC20(token).transfer(msg.sender, finalAmount);
-        if (penalty > 0) {
-            IERC20(token).transfer(address(this), penalty);
-        }
-
-        emit Withdrawn(msg.sender, token, amount, penalty);
-    }
-
-    function claimRewards() external nonReentrant whenNotPaused {
-        UserInfo storage user = userInfo[msg.sender];
-        uint256 pending = _calculateRewards(msg.sender);
-        require(pending > 0, "No rewards to claim");
-
-        user.rewardDebt = block.timestamp;
-        rewardPool -= pending;
-
-        require(
-            governanceToken.transfer(msg.sender, pending),
-            "Reward transfer failed"
-        );
-
-        emit RewardsClaimed(msg.sender, pending);
-    }
-
-    function _calculatePenalty(UserInfo memory user, uint256 amount)
-        internal
-        view
-        returns (uint256)
-    {
-        if (block.timestamp < user.lastStakeTime + penaltyPeriod) {
-            return (amount * penaltyFee) / 100;
-        }
-        return 0;
-    }
-
-    function _calculateRewards(address _user) internal view returns (uint256) {
-        UserInfo memory userInfo = userInfo[_user];
-        uint256 timeElapsed = block.timestamp - userInfo.rewardDebt;
-        uint256 totalStaked = userInfo.amountA + userInfo.amountB;
-
-        if (timeElapsed == 0 || totalStaked == 0) return 0;
-
-        return (totalStaked * timeElapsed * PRECISION) / (7 days);
-    }
-
-    // Governance functions
-    function updatePenaltyFee(uint256 newFee) external {
-        require(
-            governanceToken.balanceOf(msg.sender) >= 1000 * PRECISION,
-            "Insufficient governance tokens"
-        );
-        require(newFee <= 20, "Fee too high");
-
-        emit PenaltyUpdated(penaltyFee, newFee);
-        penaltyFee = newFee;
-    }
-
-    // Emergency functions
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    function emergencyWithdraw(address token) external nonReentrant {
-        require(paused(), "Protocol must be paused");
-        UserInfo storage user = userInfo[msg.sender];
-
-        uint256 amount = token == address(stakeTokenA) ? user.amountA : user.amountB;
-        require(amount > 0, "No tokens to withdraw");
-
-        if (token == address(stakeTokenA)) {
-            user.amountA = 0;
-        } else {
-            user.amountB = 0;
-        }
-
-        IERC20(token).transfer(msg.sender, amount);
-        emit Withdrawn(msg.sender, token, amount, 0);
-    }
-}`;
+    const bigContract = bigDefiContract
+      .replace("// ...the big solidity contract string...", "SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n// ...rest of contract...");
+    // We use the other templates for the readme and deployment config
+    const readme = readmeContent
+      .replace("// ...the markdown README content...", "## Implementation details\n// ...rest of README...");
+    const deployConf = deployConfig
+      .replace("// ...the deployment configuration string...", "// Custom deployment instructions here");
 
     // Additional files for the editor
-    const readmeContent = `# MyAdvancedDeFi Protocol
-
-## Overview
-This is a production-ready DeFi protocol implementing:
-${finalReqs.map((r) => `- ${r}`).join("\n")}
-
-## Features
-- Multi-token staking support
-- Time-based rewards distribution
-- Early withdrawal penalties
-- Governance integration
-- Emergency withdrawal mechanism
-- Comprehensive security measures
-
-## Security Features
-- ReentrancyGuard for all state-changing functions
-- Pausable for emergency situations
-- Precise mathematical calculations
-- Event emission for transparency
-- Input validation and bounds checking
-
-## Deployment
-1. Deploy governance token
-2. Deploy staking tokens (if new)
-3. Deploy main contract with:
-   - Token A address
-   - Token B address
-   - Governance token address
-   - Initial rewards amount
-
-## Testing
-Run full test suite before deployment:
-\`\`\`bash
-npx hardhat test
-npx hardhat coverage
-\`\`\`
-
-## Audit Status
-Pending security audit. Key areas to review:
-- Reward calculation precision
-- Withdrawal penalty logic
-- Governance token integration
-- Emergency procedures`;
-
-    const deployConfig = `// Deployment Configuration
-module.exports = {
-  // Network selection
-  network: "goerli",
-
-  // Contract addresses
-  tokenA: "0xTokenA...",  // Staking token A
-  tokenB: "0xTokenB...",  // Staking token B
-  govToken: "0xGov...",   // Governance token
-
-  // Initial parameters
-  initialRewards: "1000000000000000000000", // 1,000 tokens (18 decimals)
-
-  // Verification settings
-  verify: true,
-
-  // Constructor arguments
-  constructorArgs: [
-    "0xTokenA...",
-    "0xTokenB...",
-    "0xGov...",
-    "1000000000000000000000"
-  ],
-
-  // Gas settings
-  gasPrice: "auto",
-  gasLimit: 5000000
-};`;
-
-    // Populate the editor with 3 files
     const initialFiles: CodeFile[] = [
       {
         name: "MyAdvancedDeFi.sol",
-        content: bigDefiContract,
-        language: "solidity",
+        content: bigContract,
+        language: "sol",
         lastModified: new Date()
       },
       {
         name: "README.md",
-        content: readmeContent,
+        content: readme,
         language: "markdown",
         lastModified: new Date()
       },
       {
         name: "deploy-config.js",
-        content: deployConfig,
+        content: deployConf,
         language: "javascript",
         lastModified: new Date()
       }
