@@ -339,6 +339,10 @@ app.post("/api/chat", async (req, res) => {
     const classificationPrompt = `
       You will read the user's message and classify it into one of the following modes:
       "requirements", "research", "development", "audit", "deployment", "general".
+      If requirements are not provided or clear then choose "requirements".
+      If research & requirements are not provided or clear then choose "research".
+      If research & requirements are clear and development is being told then choose "development".
+      So on and so forth.
       Provide only the single word: requirements, research, development, audit, deployment, or general.
 
       User message: "${userMessage}"
@@ -357,43 +361,106 @@ app.post("/api/chat", async (req, res) => {
     const allowedModes = ["requirements", "research", "development", "audit", "deployment", "general"];
     const mode = allowedModes.includes(rawMode) ? rawMode : "general";
 
-    // 2) Build the specialized prompt based on the classification
+    // 2) Get specialized prompt and enhance it with context
     let specializedPrompt = "";
-    if (mode === "requirements") {
-      specializedPrompt = PROMPT_REQUIREMENTS;
+    if (mode === "development") {
+      specializedPrompt = `You are a smart contract development expert.
+      Based on the user's request, provide:
+      1. A complete, working smart contract implementation
+      2. Detailed code comments explaining key functionality
+      3. Security considerations and best practices used
+      4. Any relevant deployment notes
+
+      Here are some guidelines:
+      - Use Solidity ^0.8.0
+      - Include proper SPDX license identifier
+      - Implement reentrancy protection
+      - Add events for important state changes
+      - Use require statements for input validation
+      - Follow ERC standards where applicable
+
+      User request: "${userMessage}"
+
+      Format your response with:
+      1. Brief explanation of implementation
+      2. Complete code in a code block (use \`\`\`)
+      3. Security notes and considerations
+      `;
+    } else if (mode === "requirements") {
+      specializedPrompt = `${PROMPT_REQUIREMENTS}
+      Your task: Analyze requirements and provide:
+      1. List of validated requirements
+      2. Suggested security features
+      3. Any missing critical requirements`;
     } else if (mode === "research") {
-      specializedPrompt = PROMPT_RESEARCH;
-    } else if (mode === "development") {
-      specializedPrompt = PROMPT_DEVELOPMENT;
+      specializedPrompt = `${PROMPT_RESEARCH}`;
     } else if (mode === "audit") {
-      specializedPrompt = PROMPT_AUDIT;
+      specializedPrompt = `${PROMPT_AUDIT}
+      Your task: Perform security analysis:
+      1. List potential vulnerabilities
+      2. Suggest security improvements
+      3. Review any critical sections`;
     } else if (mode === "deployment") {
-      specializedPrompt = PROMPT_DEPLOYMENT;
+      specializedPrompt = `${PROMPT_DEPLOYMENT}
+      Your task: Guide deployment process:
+      1. Deployment steps and checklist
+      2. Configuration requirements
+      3. Post-deployment verification`;
     } else {
       specializedPrompt = PROMPT_GENERAL;
     }
-    specializedPrompt += ` User message: "${userMessage}"`;
 
-    // 3) Send the specialized prompt to the agent
+    // Add user message at the end
+    specializedPrompt += `\n\nUser message: "${userMessage}"`;
+
+    // 3) Send to AI and collect response
     const agentStream = await session.agent.stream(
       { messages: [new HumanMessage(specializedPrompt)] },
       session.agentConfig
     );
 
-    let finalText = "";
+    // 4) Process the response
+    let responseText = "";
+    let codeBlocks: string[] = []; // Add type annotation here
+    let currentBlock = "";
+    let inCodeBlock = false;
+
     for await (const chunk of agentStream) {
       if ("agent" in chunk) {
-        finalText += chunk.agent.messages[0].content + "\n";
+        const content = chunk.agent.messages[0].content;
+
+        // Parse content for code blocks
+        const lines = content.split('\n');
+        for (const line of lines) {
+          if (line.includes('```')) {
+            if (inCodeBlock) {
+              codeBlocks.push(currentBlock);
+              currentBlock = "";
+            }
+            inCodeBlock = !inCodeBlock;
+          } else if (inCodeBlock) {
+            currentBlock += line + '\n';
+          } else {
+            responseText += line + '\n';
+          }
+        }
       } else if ("tools" in chunk) {
-        finalText += `(TOOL-LOG) ${chunk.tools.messages[0].content}\n`;
+        responseText += `(TOOL-LOG) ${chunk.tools.messages[0].content}\n`;
       }
     }
 
     // 5) Return a JSON response, including the mode
     return res.json({
       mode,
-      response: finalText.trim(),
+      response: responseText.trim(),
+      codeBlocks,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        model: "gpt-4o-mini",
+        sessionId: chatId
+      }
     });
+
   } catch (err) {
     console.error("Error in /api/chat:", err);
     return res.status(500).json({ error: String(err) });
