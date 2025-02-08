@@ -1024,8 +1024,8 @@ module.exports = {
           split="horizontal"
           defaultSize="60%"
           minSize="10%"
+          maxSize="90%"
           resizerStyle={horizontalResizerStyle}
-          style={{ position: "relative" }}
         >
           {/* TOP: Editor Panel */}
           <div className="w-full h-full flex flex-col overflow-y-auto overflow-x-hidden">
