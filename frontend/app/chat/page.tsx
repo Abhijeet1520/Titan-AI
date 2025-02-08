@@ -2,7 +2,6 @@
 import Editor from "@monaco-editor/react";
 import {
   AlertCircle,
-  Blocks,
   Bot,
   Brain,
   CheckCircle2,
@@ -10,8 +9,10 @@ import {
   Database,
   Download,
   FileCode,
+  Fullscreen,
   GitBranch,
   Layout,
+  Minimize,
   Plus,
   Send,
   Settings,
@@ -69,12 +70,14 @@ interface MultiFileEditorProps {
   files: CodeFile[];
   setFiles: React.Dispatch<React.SetStateAction<CodeFile[]>>;
   isFullscreen: boolean; // Whether the editor is expanded to full-screen
+  setIsFullscreen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   files,
   setFiles,
-  isFullscreen
+  isFullscreen,
+  setIsFullscreen
 }) => {
   // track which file is active
   const [activeTab, setActiveTab] = useState(0);
@@ -92,10 +95,20 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
 
   return (
     <div
-      className={`flex flex-col h-full relative ${
-        isFullscreen ? "fixed inset-0 z-50 bg-white" : ""
-      }`}
+      className={
+        isFullscreen
+          ? "fixed top-[6%] left-0 w-[100%] h-[95%] z-[999] bg-white flex flex-col"
+          : "relative h-full flex flex-col"
+      }
     >
+      {isFullscreen && (
+        <button
+          onClick={() => setIsFullscreen(false)}
+          className="absolute right-0 p-2 m-2 bg-gray-200 rounded-md shadow text-sm z-[9999] flex items-center gap-2"
+        >
+          <Minimize className="w-4 h-4" />
+        </button>
+      )}
       {/* Tabs with file info */}
       <div className="flex items-center border-b bg-gray-50 overflow-x-auto">
         <div className="flex-1 flex">
@@ -123,7 +136,7 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
             </button>
           ))}
         </div>
-        <div className="flex-shrink-0 border-l px-2">
+        {/* <div className="flex-shrink-0 border-l px-2">
           <button
             onClick={() =>
               console.log("Add more settings for the editor if needed")
@@ -133,7 +146,7 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
           >
             <Settings className="w-4 h-4 text-gray-600" />
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* Code Editor */}
@@ -654,6 +667,7 @@ function Home() {
           className="h-full w-full"
           minSize="10%"
           maxSize="90%"
+          // style={{ position: isFullscreen ? "static" : "relative", flex: 1 }}
           resizerStyle={horizontalResizerStyle}
         >
 
@@ -956,7 +970,7 @@ function Home() {
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                   title="Toggle Fullscreen"
                 >
-                  <Blocks className="w-4 h-4 text-gray-600" />
+                  <Fullscreen className="w-4 h-4 text-gray-600" />
                 </button>
               </div>
             </div>
@@ -965,6 +979,7 @@ function Home() {
                 files={files}
                 setFiles={setFiles}
                 isFullscreen={isFullscreen}
+                setIsFullscreen={setIsFullscreen}
               />
             </div>
           </div>
