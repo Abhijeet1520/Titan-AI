@@ -32,7 +32,7 @@ interface Message {
   id: number;
   content: string;
   sender: "user" | "ai";
-  agentId: string;          // which agent this message belongs to
+  agentId: string; // which agent this message belongs to
   timestamp: Date;
   codeBlocks?: string[];
   securityChecks?: string[];
@@ -102,7 +102,11 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   };
 
   return (
-    <div className={`flex flex-col h-full relative ${isFullscreen ? "fixed inset-0 z-50 bg-white" : ""}`}>
+    <div
+      className={`flex flex-col h-full relative ${
+        isFullscreen ? "fixed inset-0 z-50 bg-white" : ""
+      }`}
+    >
       {/* Tabs with file info */}
       <div className="flex items-center border-b bg-gray-50 overflow-x-auto">
         <div className="flex-1 flex">
@@ -110,15 +114,19 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
             <button
               key={idx}
               onClick={() => setActiveTab(idx)}
-              className={`px-4 py-3 flex items-center gap-2 border-r min-w-[150px]
-                ${activeTab === idx
-                  ? "bg-white border-b-2 border-b-blue-500 font-medium"
-                  : "hover:bg-gray-100"
+              className={`flex items-center gap-2 border-r min-w-[8rem]
+                px-3 py-2
+                ${
+                  activeTab === idx
+                    ? "bg-white border-b-2 border-b-blue-500 font-medium"
+                    : "hover:bg-gray-100"
                 }`}
             >
               <FileCode className="w-4 h-4 text-gray-500" />
               <div className="flex flex-col items-start">
-                <span className="text-sm truncate max-w-[100px]">{file.name}</span>
+                <span className="text-sm truncate max-w-[12rem]">
+                  {file.name}
+                </span>
                 <span className="text-xs text-gray-500">
                   {new Date(file.lastModified).toLocaleTimeString()}
                 </span>
@@ -128,7 +136,9 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
         </div>
         <div className="flex-shrink-0 border-l px-2">
           <button
-            onClick={() => console.log("Add more settings for the editor if needed")}
+            onClick={() =>
+              console.log("Add more settings for the editor if needed")
+            }
             className="p-2 hover:bg-gray-100 rounded-lg"
             title="Editor Settings"
           >
@@ -172,7 +182,7 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   - Left: Chat
   - Right: Editor on top, bottom has tabs (Requirements, Research, etc.)
   - Draggable/resizable using SplitPane
-  ---------------------------------------------------------------------*/
+---------------------------------------------------------------------*/
 function Home() {
   // State declarations
   const [input, setInput] = useState("");
@@ -186,29 +196,44 @@ function Home() {
       id: "research",
       name: "Research Agent",
       description: "Provides domain/market research & suggestions",
-      icon: <Brain />,
-      expertise: ["Market Analysis", "Competitor Research", "Trend Analysis", "Risk Assessment"]
+      icon: <Brain className="w-5 h-5" />,
+      expertise: [
+        "Market Analysis",
+        "Competitor Research",
+        "Trend Analysis",
+        "Risk Assessment"
+      ]
     },
     {
       id: "developer",
       name: "Developer Agent",
       description: "Implements the contract logic",
-      icon: <Terminal />,
+      icon: <Terminal className="w-5 h-5" />,
       expertise: ["Smart Contracts", "Gas Optimization", "Testing", "Integration"]
     },
     {
       id: "auditor",
       name: "Auditor Agent",
       description: "Analyzes and audits the contract for vulnerabilities",
-      icon: <Shield />,
-      expertise: ["Security Analysis", "Best Practices", "Vulnerability Detection", "Code Review"]
+      icon: <Shield className="w-5 h-5" />,
+      expertise: [
+        "Security Analysis",
+        "Best Practices",
+        "Vulnerability Detection",
+        "Code Review"
+      ]
     },
     {
       id: "deployment",
       name: "Deployment Specialist",
       description: "Handles final deployment & verification steps",
-      icon: <GitBranch />,
-      expertise: ["Network Selection", "Contract Verification", "Gas Estimation", "Deployment Strategy"]
+      icon: <GitBranch className="w-5 h-5" />,
+      expertise: [
+        "Network Selection",
+        "Contract Verification",
+        "Gas Estimation",
+        "Deployment Strategy"
+      ]
     }
   ];
 
@@ -218,15 +243,20 @@ function Home() {
       id: "defi",
       name: "DeFi Protocol",
       description: "Medium-High complexity staking or yield strategies",
-      icon: <Database />,
-      features: ["Multi-token Support", "Yield Optimization", "Flash Loans", "Governance"],
+      icon: <Database className="w-5 h-5" />,
+      features: [
+        "Multi-token Support",
+        "Yield Optimization",
+        "Flash Loans",
+        "Governance"
+      ],
       complexity: "High"
     },
     {
       id: "nft",
       name: "NFT Platform",
       description: "Minting, marketplace, and royalties",
-      icon: <FileCode />,
+      icon: <FileCode className="w-5 h-5" />,
       features: ["ERC-721/1155", "Marketplace", "Royalties", "Metadata"],
       complexity: "Medium"
     },
@@ -234,8 +264,13 @@ function Home() {
       id: "dao",
       name: "DAO Framework",
       description: "Governance tokens, proposals, and voting",
-      icon: <Layout />,
-      features: ["Token Voting", "Proposal System", "Treasury Management", "Timelock"],
+      icon: <Layout className="w-5 h-5" />,
+      features: [
+        "Token Voting",
+        "Proposal System",
+        "Treasury Management",
+        "Timelock"
+      ],
       complexity: "High"
     }
   ];
@@ -289,7 +324,7 @@ function Home() {
   // AI suggestions - stored for the latest AI response
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
 
-  // For toggling the Editor"s fullscreen
+  // For toggling the Editor's fullscreen
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Bottom Tabs: requirements, research, audit, deployment
@@ -309,7 +344,6 @@ function Home() {
       "ReentrancyGuard to protect critical flows"
     ];
     setRequirements(defaultReqs);
-
   }, []);
 
   /* ------------------------------------------------------------------
@@ -319,9 +353,9 @@ function Home() {
     setIsProcessing(true);
     try {
       // Simulated wallet connection
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       setIsWalletConnected(true);
-setWalletAddress("0x1234...5678");
+      setWalletAddress("0x1234...5678");
     } catch (error) {
       console.error("Wallet connection failed:", error);
     } finally {
@@ -543,7 +577,7 @@ contract MyAdvancedDeFi is ReentrancyGuard, Ownable, Pausable {
 
 ## Overview
 This is a production-ready DeFi protocol implementing:
-${finalReqs.map(r => `- ${r}`).join("\n")}
+${finalReqs.map((r) => `- ${r}`).join("\n")}
 
 ## Features
 - Multi-token staking support
@@ -692,11 +726,11 @@ module.exports = {
     });
 
     // Simulate AI response delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const aiMsg: Message = {
       id: oldMessages.length + 2,
-      content: `Here"s an updated implementation based on your request. (Using ${selectedModel})`,
+      content: `Here's an updated implementation based on your request. (Using ${selectedModel})`,
       sender: "ai",
       agentId,
       timestamp: new Date(),
@@ -731,31 +765,38 @@ module.exports = {
        Render
   --------------------------------------------------------------------*/
   const currentAgentChats = agentMessages[selectedAgentId] || [];
-  const selectedAgentDetails = agents.find(a => a.id === selectedAgentId);
-  const selectedProjectDetails = projectTypes.find(p => p.id === selectedProject);
+  const selectedAgentDetails = agents.find((a) => a.id === selectedAgentId);
+  const selectedProjectDetails = projectTypes.find((p) => p.id === selectedProject);
 
-  // Resizer styles
+  // SplitPane resizer styles (still possible to use a small px or your own classes)
   const verticalResizerStyle: React.CSSProperties = {
-    width: "8px",
-    background: "#e2e8f0",
+    width: "6px",
+    background: "#e2eff0",
     cursor: "col-resize",
     margin: "0 2px",
-    zIndex: 1,
+    zIndex: 1
   };
   const horizontalResizerStyle: React.CSSProperties = {
-    height: "4px",
-    background: "#e2e8f0",
+    height: "6px",
+    minHeight: "3px",
+    background: "#e2eff0",
     cursor: "row-resize",
-    margin: "2px 0",
-    zIndex: 1,
+    margin: "0",
+    zIndex: 1
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col h-full w-full">
       {/* Top Bar: LLM dropdown + Wallet Connect */}
-      <div className="w-full h-14 flex items-center justify-between bg-white border-b px-4">
-        <div className="flex items-center gap-3">
-          <Image src="/android-chrome-192x192.png" alt="Titan AI Logo" width={32} height={32} />
+      <div className="h-14 flex items-center justify-between bg-white border-b px-6">
+        <div className="flex items-center gap-4">
+          <Image
+            src="/android-chrome-192x192.png"
+            alt="Titan AI Logo"
+            width={32}
+            height={32}
+            className="object-contain"
+          />
           <span className="font-bold text-xl text-blue-600">Titan AI</span>
 
           {/* Project selection (Optional) */}
@@ -767,7 +808,7 @@ module.exports = {
               generateContract(requirements);
             }}
           >
-            {projectTypes.map(pt => (
+            {projectTypes.map((pt) => (
               <option key={pt.id} value={pt.id}>
                 {pt.name}
               </option>
@@ -777,14 +818,14 @@ module.exports = {
 
         <div className="flex items-center gap-4">
           {/* LLM Models Dropdown */}
-          <div>
+          <div className="flex items-center">
             <label className="mr-1 text-sm text-gray-600">Model:</label>
             <select
               className="border border-gray-300 rounded-lg px-2 py-1 text-sm"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
             >
-              {chatModels.map(model => (
+              {chatModels.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.name}
                 </option>
@@ -796,19 +837,18 @@ module.exports = {
           <button
             onClick={handleConnectWallet}
             disabled={isProcessing}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               isWalletConnected
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
             } ${isProcessing ? "opacity-75 cursor-not-allowed" : ""}`}
           >
-            <Wallet className="w-4 h-4" />
+            <Wallet className="w-5 h-5" />
             {isProcessing
               ? "Connecting..."
               : isWalletConnected
-                ? walletAddress
-                : "Connect Wallet"
-            }
+              ? walletAddress
+              : "Connect Wallet"}
           </button>
         </div>
       </div>
@@ -818,22 +858,23 @@ module.exports = {
       <SplitPane
         split="vertical"
         defaultSize="60%"
-        minSize={300}
+        minSize="20%"
         resizerStyle={verticalResizerStyle}
         style={{ position: "relative", flex: 1 }}
       >
         {/* LEFT: Chat Panel */}
-        <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden">
-          {/* Agent selection (optional) */}
+        <div className="flex flex-col h-full overflow-y-scroll overflow-x-hidden">
+          {/* Agent selection */}
           <div className="flex gap-2 p-3 border-b bg-gray-50">
-            {agents.map(agent => (
+            {agents.map((agent) => (
               <button
                 key={agent.id}
                 onClick={() => setSelectedAgentId(agent.id)}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors
-                  ${selectedAgentId === agent.id
-                    ? "bg-blue-500 text-white"
-                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
+                  ${
+                    selectedAgentId === agent.id
+                      ? "bg-blue-500 text-white"
+                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-100"
                   }`}
               >
                 {agent.icon}
@@ -843,123 +884,132 @@ module.exports = {
           </div>
 
           {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto">
-            <div className="h-full w-full p-4 space-y-4">
-                {currentAgentChats.map((message) => (
+          <div className="flex-1 overflow-y-auto">
+            <div className="w-full p-3 space-y-3 w-max-[100] overflow-y-scroll">
+              {currentAgentChats.map((message) => (
                 <div
-                key={message.id}
-                className={`flex items-start gap-3 ${
-                message.sender === "user" ? "flex-row-reverse" : ""
-                }`}
-                >
-                <div
-                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                  message.sender === "user"
-                  ? "bg-blue-100"
-                  : "bg-gray-100"
-                }`}
-                >
-                {message.sender === "user" ? (
-                  <Zap className="w-5 h-5 text-blue-600" />
-                ) : (
-                  selectedAgentDetails?.icon || <Bot className="w-5 h-5 text-gray-600" />
-                )}
-                </div>
-
-                <div
-                className={`flex-1 max-w-[80%] ${
-                  message.status === "pending" ? "opacity-70" : ""
-                }`}
-                >
-                <div
-                  className={`p-4 rounded-2xl ${
-                  message.sender === "user"
-                  ? "bg-blue-500 text-white ml-auto"
-                  : "bg-white border shadow-sm"
+                  key={message.id}
+                  className={`flex items-start gap-3 ${
+                    message.sender === "user" ? "flex-row-reverse" : ""
                   }`}
                 >
-                  {message.status === "pending" ? (
-                  <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 animate-spin" />
-                  <span>{message.content}</span>
+                  <div
+                    className={`flex-shrink-0 rounded-full flex items-center justify-center w-10 h-10 ${
+                      message.sender === "user" ? "bg-blue-100" : "bg-gray-100"
+                    }`}
+                  >
+                    {message.sender === "user" ? (
+                      <Zap className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      selectedAgentDetails?.icon ?? (
+                        <Bot className="w-4 h-4 text-gray-600" />
+                      )
+                    )}
                   </div>
-                  ) : (
-                  <>
-                  <p className="text-sm lg:text-base">{message.content}</p>
 
-                  {message.codeBlocks?.length ? (
-                  <div className="mt-3 space-y-2">
-                    {message.codeBlocks.map((block, idx) => (
-                    <pre
-                    key={idx}
-                    className="bg-gray-900 text-green-400 p-4 rounded-lg text-xs lg:text-sm overflow-x-auto"
+                  <div
+                    className={`flex-1 max-w-[80%] ${
+                      message.status === "pending" ? "opacity-70" : ""
+                    }`}
+                  >
+                    <div
+                      className={`p-3 rounded-2xl ${
+                        message.sender === "user"
+                          ? "bg-blue-500 text-white ml-auto"
+                          : "bg-white border shadow-sm"
+                      }`}
                     >
-                    {block}
-                    </pre>
-                    ))}
-                  </div>
-                  ) : null}
+                      {message.status === "pending" ? (
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 animate-spin" />
+                          <span>{message.content}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm lg:text-base">
+                            {message.content}
+                          </p>
+                          {message.codeBlocks?.length ? (
+                            <div className="mt-3 space-y-2">
+                              {message.codeBlocks.map((block, idx) => (
+                                <pre
+                                  key={idx}
+                                  className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs lg:text-sm overflow-x-auto"
+                                >
+                                  {block}
+                                </pre>
+                              ))}
+                            </div>
+                          ) : null}
 
-                  {/* AI suggestions */}
-                  {message.securityChecks?.length ? (
-                  <div className="mt-3 space-y-1.5">
-                    {message.securityChecks.map((check, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm text-gray-700">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span>{check}</span>
-                    </div>
-                    ))}
-                  </div>
-                  ) : null}
+                          {/* AI suggestions / security checks */}
+                          {message.securityChecks?.length ? (
+                            <div className="mt-3 space-y-1.5">
+                              {message.securityChecks.map((check, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-2 text-sm text-gray-700"
+                                >
+                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                  <span>{check}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
 
-                  {message.aiSuggestions?.length ? (
-                  <div className="mt-3 space-y-1.5">
-                    {message.aiSuggestions.map((sug, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm text-blue-700">
-                    <Zap className="w-4 h-4" />
-                    <span>{sug}</span>
+                          {message.aiSuggestions?.length ? (
+                            <div className="mt-3 space-y-1.5">
+                              {message.aiSuggestions.map((sug, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-2 text-sm text-blue-700"
+                                >
+                                  <Zap className="w-5 h-5" />
+                                  <span>{sug}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </div>
-                    ))}
+                    <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+                      {message.sender === "ai" && selectedAgentDetails && (
+                        <>
+                          <span className="font-medium">
+                            {selectedAgentDetails.name}
+                          </span>
+                          <span>•</span>
+                        </>
+                      )}
+                      <span>
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
                   </div>
-                  ) : null}
-                  </>
-                  )}
                 </div>
-                <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
-                  {message.sender === "ai" && selectedAgentDetails && (
-                  <>
-                  <span className="font-medium">{selectedAgentDetails.name}</span>
-                  <span>•</span>
-                  </>
-                  )}
-                  <span>
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-                </div>
-                </div>
-                ))}
-              </div>
+              ))}
             </div>
+          </div>
 
           {/* Chat Input */}
-          <form onSubmit={handleSendMessage} className="p-4 border-t bg-white">
+          <form onSubmit={handleSendMessage} className="p-3 border-t bg-white">
             <div className="flex items-center gap-3">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={`Ask ${selectedAgentDetails?.name || "AI"} anything...`}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder={`Ask ${
+                  selectedAgentDetails?.name || "AI"
+                } anything...`}
+                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 disabled={isProcessing}
               />
               <button
                 type="submit"
                 disabled={isProcessing}
-                className={`bg-blue-500 text-white p-2.5 rounded-xl transition-colors ${
-                  isProcessing
-                    ? "opacity-75 cursor-not-allowed"
-                    : "hover:bg-blue-600"
+                className={`bg-blue-500 text-white p-2 rounded-xl transition-colors ${
+                  isProcessing ? "opacity-75 cursor-not-allowed" : "hover:bg-blue-600"
                 }`}
               >
                 <Send className="w-5 h-5" />
@@ -973,16 +1023,18 @@ module.exports = {
         <SplitPane
           split="horizontal"
           defaultSize="60%"
-          minSize={150}
+          minSize="10%"
           resizerStyle={horizontalResizerStyle}
           style={{ position: "relative" }}
         >
           {/* TOP: Editor Panel */}
           <div className="w-full h-full flex flex-col overflow-y-auto overflow-x-hidden">
-            <div className="flex items-center justify-between p-4 border-b bg-white">
+            <div className="flex items-center justify-between p-3 border-b bg-white">
               <div className="flex items-center gap-3">
-                <FileCode className="w-5 h-5 text-gray-500" />
-                <h2 className="font-semibold text-gray-800">Smart Contract Editor</h2>
+                <FileCode className="w-4 h-4 text-gray-500" />
+                <h2 className="font-semibold text-gray-800">
+                  Smart Contract Editor
+                </h2>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -990,14 +1042,14 @@ module.exports = {
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                   title="Download Contract"
                 >
-                  <Download className="w-5 h-5 text-gray-600" />
+                  <Download className="w-4 h-4 text-gray-600" />
                 </button>
                 <button
                   onClick={() => setIsFullscreen(!isFullscreen)}
                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                   title="Toggle Fullscreen"
                 >
-                  <Blocks className="w-5 h-5 text-gray-600" />
+                  <Blocks className="w-4 h-4 text-gray-600" />
                 </button>
               </div>
             </div>
@@ -1013,12 +1065,12 @@ module.exports = {
           {/* BOTTOM: TABS (Requirements, Research, Audit, Deployment) */}
           <div className="w-full h-full flex flex-col bg-white overflow-y-auto overflow-x-hidden">
             {/* Tab Bar */}
-            <div className="flex items-center gap-2 border-b px-4 bg-gray-50">
-              {bottomTabs.map(tab => (
+            <div className="flex items-center gap-2 border-b px-3 bg-gray-50">
+              {bottomTabs.map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveBottomTab(tab)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors
+                  className={`px-3 py-2 text-sm font-medium transition-colors
                     ${
                       activeBottomTab === tab
                         ? "border-b-2 border-blue-500 text-blue-700"
@@ -1031,41 +1083,44 @@ module.exports = {
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+            <div className="flex-1 overflow-y-auto p-3">
               {/* REQUIREMENTS TAB */}
               {activeBottomTab === "requirements" && (
                 <div>
-                  <h2 className="text-lg font-semibold mb-3">Project Requirements</h2>
+                  <h2 className="text-lg font-semibold mb-3">
+                    Project Requirements
+                  </h2>
                   <div className="mb-4 flex items-center gap-3">
                     <input
                       type="text"
                       value={currentRequirement}
                       onChange={(e) => setCurrentRequirement(e.target.value)}
-                      onKeyPress={(e) => e.key === "Enter" && handleAddRequirement()}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && handleAddRequirement()
+                      }
                       placeholder="Add requirement..."
-                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     />
                     <button
                       onClick={handleAddRequirement}
-                      className="bg-blue-500 text-white p-2.5 rounded-xl hover:bg-blue-600 transition-colors"
+                      className="bg-blue-500 text-white p-2 rounded-xl hover:bg-blue-600 transition-colors"
                     >
                       <Plus className="w-5 h-5" />
                     </button>
                   </div>
-
-                  {/* List each requirement vertically */}
+                  {/* List each requirement */}
                   {requirements.length > 0 && (
                     <ul className="space-y-3">
                       {requirements.map((req, idx) => (
                         <li
                           key={idx}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-sm"
+                          className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm"
                         >
                           <button
                             onClick={() => handleRemoveRequirement(idx)}
                             className="text-gray-400 hover:text-red-500"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5" />
                           </button>
                           <span className="text-gray-700 flex-1">{req}</span>
                         </li>
@@ -1077,7 +1132,7 @@ module.exports = {
 
               {/* RESEARCH TAB */}
               {activeBottomTab === "research" && (
-                <div className="max-w-4xl">
+                <div className="max-w-100">
                   <h2 className="text-lg font-semibold mb-3">
                     {selectedProjectDetails?.name} Analysis
                   </h2>
@@ -1086,25 +1141,33 @@ module.exports = {
                     <span className="text-gray-700">
                       {selectedProjectDetails?.description}
                     </span>
-                    <span className={`
-                      px-3 py-1 rounded-full text-sm font-medium
-                      ${selectedProjectDetails?.complexity === "High"
-                        ? "bg-red-100 text-red-700"
-                        : selectedProjectDetails?.complexity === "Medium"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-green-100 text-green-700"
-                      }
-                    `}>
+                    <span
+                      className={`
+                        px-3 py-1 rounded-full text-sm font-medium
+                        ${
+                          selectedProjectDetails?.complexity === "High"
+                            ? "bg-red-100 text-red-700"
+                            : selectedProjectDetails?.complexity === "Medium"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
+                        }
+                      `}
+                    >
                       {selectedProjectDetails?.complexity} Complexity
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     <div className="bg-white rounded-xl shadow-sm border p-6">
-                      <h3 className="text-md font-semibold mb-4">Key Features</h3>
+                      <h3 className="text-md font-semibold mb-4">
+                        Key Features
+                      </h3>
                       <ul className="space-y-2">
                         {selectedProjectDetails?.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-gray-700">
+                          <li
+                            key={idx}
+                            className="flex items-center gap-2 text-gray-700"
+                          >
                             <CheckCircle2 className="w-4 h-4 text-green-500" />
                             <span>{feature}</span>
                           </li>
@@ -1113,10 +1176,14 @@ module.exports = {
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm border p-6">
-                      <h3 className="text-md font-semibold mb-4">Market Analysis</h3>
+                      <h3 className="text-md font-semibold mb-4">
+                        Market Analysis
+                      </h3>
                       <div className="space-y-4">
                         <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Market Size</h4>
+                          <h4 className="font-medium text-gray-900 mb-2">
+                            Market Size
+                          </h4>
                           <div className="bg-gray-100 rounded-lg p-3">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">Current TVL</span>
@@ -1124,25 +1191,35 @@ module.exports = {
                             </div>
                             <div className="flex items-center justify-between text-sm mt-2">
                               <span className="text-gray-600">Growth Rate</span>
-                              <span className="font-medium text-green-600">+15% MoM</span>
+                              <span className="font-medium text-green-600">
+                                +15% MoM
+                              </span>
                             </div>
                           </div>
                         </div>
 
                         <div>
-                          <h4 className="font-medium text-gray-900 mb-2">Competition</h4>
+                          <h4 className="font-medium text-gray-900 mb-2">
+                            Competition
+                          </h4>
                           <div className="space-y-2">
                             <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
                               <span>Aave</span>
-                              <span className="font-medium">32% Market Share</span>
+                              <span className="font-medium">
+                                32% Market Share
+                              </span>
                             </div>
                             <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
                               <span>Compound</span>
-                              <span className="font-medium">28% Market Share</span>
+                              <span className="font-medium">
+                                28% Market Share
+                              </span>
                             </div>
                             <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
                               <span>Others</span>
-                              <span className="font-medium">40% Market Share</span>
+                              <span className="font-medium">
+                                40% Market Share
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -1157,7 +1234,9 @@ module.exports = {
                         <AlertCircle className="w-5 h-5" />
                         <div>
                           <span className="font-medium">High Risk:</span>
-                          <span className="ml-1">Smart contract vulnerabilities</span>
+                          <span className="ml-1">
+                            Smart contract vulnerabilities
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 p-3 bg-yellow-50 text-yellow-700 rounded-lg">
@@ -1171,33 +1250,45 @@ module.exports = {
                         <CheckCircle2 className="w-5 h-5" />
                         <div>
                           <span className="font-medium">Low Risk:</span>
-                          <span className="ml-1">Regulatory compliance (with KYC)</span>
+                          <span className="ml-1">
+                            Regulatory compliance (with KYC)
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="bg-white rounded-xl shadow-sm border p-6">
-                    <h3 className="text-md font-semibold mb-4">Development Timeline</h3>
+                    <h3 className="text-md font-semibold mb-4">
+                      Development Timeline
+                    </h3>
                     <div className="space-y-4">
                       <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">Phase 1: Smart Contract Development</h4>
+                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
+                        <h4 className="font-medium text-gray-900">
+                          Phase 1: Smart Contract Development
+                        </h4>
                         <p className="text-sm text-gray-600 mt-1">2-3 weeks</p>
                       </div>
                       <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">Phase 2: Security Audit</h4>
+                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
+                        <h4 className="font-medium text-gray-900">
+                          Phase 2: Security Audit
+                        </h4>
                         <p className="text-sm text-gray-600 mt-1">2 weeks</p>
                       </div>
                       <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">Phase 3: Frontend Development</h4>
+                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
+                        <h4 className="font-medium text-gray-900">
+                          Phase 3: Frontend Development
+                        </h4>
                         <p className="text-sm text-gray-600 mt-1">3-4 weeks</p>
                       </div>
                       <div className="relative pl-8">
-                        <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">Phase 4: Testing & Deployment</h4>
+                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
+                        <h4 className="font-medium text-gray-900">
+                          Phase 4: Testing & Deployment
+                        </h4>
                         <p className="text-sm text-gray-600 mt-1">1-2 weeks</p>
                       </div>
                     </div>
@@ -1230,7 +1321,7 @@ module.exports = {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-gray-500 text-sm">
-                      <Clock className="w-4 h-4" />
+                      <Clock className="w-5 h-5" />
                       <span>Waiting for security analysis...</span>
                     </div>
                   )}
