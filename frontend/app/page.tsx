@@ -240,7 +240,7 @@ function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center gap-2">
-              <Blocks className="w-8 h-8 text-blue-600" />
+              <Image src="/android-chrome-192x192.png" alt="Titan AI Logo" width={32} height={32} />
               <span className="font-bold text-2xl text-blue-600">Titan AI</span>
             </div>
             <button

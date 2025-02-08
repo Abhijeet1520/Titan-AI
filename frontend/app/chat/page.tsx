@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import SplitPane from 'react-split-pane';
+import Image from 'next/image';
 
 /* -------------------------------------------------------------------
   TYPES & INTERFACES
@@ -754,7 +755,7 @@ module.exports = {
       {/* Top Bar: LLM dropdown + Wallet Connect */}
       <div className="w-full h-14 flex items-center justify-between bg-white border-b px-4">
         <div className="flex items-center gap-3">
-          <Blocks className="w-6 h-6 text-blue-600" />
+          <Image src="/android-chrome-192x192.png" alt="Titan AI Logo" width={32} height={32} />
           <span className="font-bold text-xl text-blue-600">Titan AI</span>
 
           {/* Project selection (Optional) */}

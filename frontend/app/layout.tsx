@@ -21,6 +21,16 @@ export const metadata: Metadata = {
 
   metadataBase: new URL("https://titanassist.vercel.app/"),
 
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+    other: {
+      rel: 'apple-touch-icon-precomposed',
+      url: '/apple-touch-icon-precomposed.png',
+    },
+  },
+
   // Open Graph configuration:
   openGraph: {
     // The canonical URL for this site or page
@@ -33,7 +43,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     images: [
       {
-        url: "https://titanassist.vercel.app/images/titan-ai-hero.webp",
+        url: "/titan-ai-hero.webp",
         width: 1200,
         height: 630,
         alt: "Titan AI – Hero Banner",
@@ -46,7 +56,7 @@ export const metadata: Metadata = {
     title: "Titan AI – Empowering Your Business with AI",
     description:
       "Seamlessly integrate advanced AI workflows to build, deploy, and scale your projects.",
-    images: ["https://titanassist.vercel.app/images/titan-ai-hero.webp"],
+    images: ["/titan-ai-hero.webp"],
   },
 };
 
@@ -57,6 +67,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" prefix="og: https://ogp.me/ns#">
+      <link rel="icon" href="/favicon.ico" />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
