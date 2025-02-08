@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.ts",
+      "src": "index.ts",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "/server.ts"
+      "src": "/api/(.*)",
+      "dest": "aiagent/dist/index.ts"
     }
   ]
 }
