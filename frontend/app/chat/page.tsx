@@ -40,7 +40,7 @@ const chatApiUrl = process.env.NEXT_PUBLIC_CHAT_API_URL || "/api/chat";
 ---------------------------------------------------------------------*/
 interface Message {
   id: number;
-  content: string;
+  content: string; // We'll store full JSON here or short text, whichever you prefer
   sender: "user" | "ai";
   agentId: string; // which agent this message belongs to
   timestamp: Date;
@@ -67,12 +67,11 @@ interface ChatModel {
 
 /* -------------------------------------------------------------------
   MULTI-FILE EDITOR COMPONENT
-  - Tabbed file editor using Monaco
 ---------------------------------------------------------------------*/
 interface MultiFileEditorProps {
   files: CodeFile[];
   setFiles: React.Dispatch<React.SetStateAction<CodeFile[]>>;
-  isFullscreen: boolean; // Whether the editor is expanded to full-screen
+  isFullscreen: boolean;
   setIsFullscreen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -82,7 +81,6 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
   isFullscreen,
   setIsFullscreen
 }) => {
-  // track which file is active
   const [activeTab, setActiveTab] = useState(0);
 
   const handleEditorChange = (value: string | undefined) => {
@@ -172,7 +170,6 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
 
 /* -------------------------------------------------------------------
   MAIN APP COMPONENT
-  - Minimal changes to handle "requirements" and other modes with improved UI
 ---------------------------------------------------------------------*/
 function Home() {
   // State declarations
@@ -221,8 +218,10 @@ function Home() {
   const [auditOutput, setAuditOutput] = useState("");
   const [deploymentOutput, setDeploymentOutput] = useState("");
 
-  // New state: suggested requirements with checkbox selection
-  const [suggestedRequirements, setSuggestedRequirements] = useState<Array<{ text: string; selected: boolean }>>([]);
+  // New state: suggested requirements
+  const [suggestedRequirements, setSuggestedRequirements] = useState<
+    Array<{ text: string; selected: boolean }>
+  >([]);
 
   // Editor Fullscreen
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -233,7 +232,7 @@ function Home() {
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>("requirements");
 
   /* ------------------------------------------------------------------
-       generateContract
+       Initialize default requirements
   --------------------------------------------------------------------*/
   useEffect(() => {
     setRequirements(defaultRequirements);
@@ -272,7 +271,7 @@ function Home() {
     generateContract(updated);
   };
 
-  // New function: toggle checkbox for suggested requirement
+  // Toggle checkbox for suggested requirement
   const handleToggleSuggestion = (index: number) => {
     const updated = suggestedRequirements.map((item, idx) => {
       if (idx === index) {
@@ -283,7 +282,7 @@ function Home() {
     setSuggestedRequirements(updated);
   };
 
-  // New function: add selected suggested requirements to current requirements
+  // Add selected suggestions to main requirements
   const handleAddSelectedSuggestions = () => {
     const toAdd = suggestedRequirements.filter(item => item.selected).map(item => item.text);
     if (toAdd.length) {
@@ -353,7 +352,7 @@ function Home() {
   };
 
   /* ------------------------------------------------------------------
-       handleSendMessage: Submits a user chat to the currently selected agent
+       handleSendMessage
   --------------------------------------------------------------------*/
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -374,7 +373,7 @@ function Home() {
       status: "complete"
     };
 
-    // Mock AI "thinking"
+    // placeholder 'thinking' AI message
     const processingMsg: Message = {
       id: oldMessages.length + 2,
       content: "Analyzing your request...",
@@ -389,9 +388,6 @@ function Home() {
       [agentId]: [...oldMessages, userMsg, processingMsg]
     });
 
-    // Simulate AI response delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
     try {
       // If no chatId yet, create one
       let usedChatId = chatId;
@@ -405,42 +401,68 @@ function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatId: usedChatId, userMessage: input })
       });
-      console.log("Sent message to server:", input);
-      console.log("Server response:", response);
-      const data = await response.json();
-      const mode = data.mode;
+      setInput("");
 
-      // Update UI based on the mode
-      if (mode === "requirements") {
+      const data = await response.json();
+      const mode = data.mode as string || "GENERAL";
+
+      // ---- MAP THE RESPONSE TO YOUR UI BASED ON MODE ----
+      // We'll store the entire JSON as a string in the final AI message.
+      // Additionally, handle specialized fields if we want to update the bottom tabs.
+
+      if (mode === "REQUIREMENTS") {
         setActiveBottomTab("requirements");
-        // Parse bullet lines from data.response as suggestions
-        const lines = data.response.split("\n").map((l: string) => l.trim());
-        const newReqs = lines
-          .filter((l: string) => l.startsWith("- "))
-          .map((l: string) => l.substring(2));
-        if (newReqs.length) {
-          // Store as suggested requirements with unchecked state
-          setSuggestedRequirements(newReqs.map(text => ({ text, selected: false })));
+        // If we get an array of requirements from the server, mark them as suggestions
+        if (Array.isArray(data.requirements)) {
+          setSuggestedRequirements(
+            data.requirements.map((req: string) => ({
+              text: req,
+              selected: false
+            }))
+          );
         }
-      } else if (mode === "research") {
+      } else if (mode === "RESEARCH") {
         setActiveBottomTab("research");
-        setResearchOutput(data.response || "");
-      } else if (mode === "audit") {
+        // If there's a 'research' field, store it
+        setResearchOutput(
+          `**${data.message}**\n\n${data.overview || ""}\n\n${data.research || ""}`
+        );
+      } else if (mode === "DEVELOPMENT") {
+        setActiveBottomTab("requirements"); // or "development" if you prefer a separate tab
+        // If there's a 'files' array in data, replace or merge with existing files
+        if (Array.isArray(data.files)) {
+          const newFiles = data.files.map((f: any) => ({
+            name: f.filename,
+            content: f.content,
+            language: f.language || "sol",
+            lastModified: f.lastModified ? new Date(f.lastModified) : new Date()
+          }));
+          setFiles(newFiles);
+        }
+      } else if (mode === "AUDIT") {
         setActiveBottomTab("audit");
-        setAuditOutput(data.response || "");
-      } else if (mode === "deployment") {
+        // If there's a 'checks' field, show them in the UI
+        if (Array.isArray(data.checks)) {
+          setLatestSecurityChecks(data.checks);
+        }
+        // Save the "message" in the audit output
+        setAuditOutput(data.message || "Audit results below:");
+      } else if (mode === "DEPLOYMENT") {
         setActiveBottomTab("deployment");
-        setDeploymentOutput(data.response || "");
+        // If there's a 'transaction_url' or other fields, store them
+        setDeploymentOutput(
+          `${data.message}\n\nContract Address: ${data.contract_address}\nTransaction: ${data.transaction_url}`
+        );
       } else {
-        // do nothing or set defaults
+        // fallback for GENERAL
+        setActiveBottomTab("requirements");
       }
 
-      console.log("Server returned mode:", mode);
-
-      // AI "final" message in chat
+      // final AI message in chat
+      // We'll stringify the entire JSON so you can see it in the chat bubble
       const aiMsg: Message = {
         id: oldMessages.length + 2,
-        content: data.response,
+        content: JSON.stringify(data, null, 2),
         sender: "ai",
         agentId,
         timestamp: new Date(),
@@ -456,12 +478,24 @@ function Home() {
       });
     } catch (error) {
       console.error("Error sending message:", error);
+      // Show an error message in chat
+      const errorMsg: Message = {
+        id: oldMessages.length + 2,
+        content: `${String(error)}`,
+        sender: "ai",
+        agentId,
+        timestamp: new Date(),
+        status: "error"
+      };
+      setAgentMessages({
+        ...agentMessages,
+        [agentId]: [...oldMessages, userMsg, errorMsg]
+      });
     } finally {
       setIsSending(false);
+      setIsProcessing(false);
     }
 
-    setInput("");
-    setIsProcessing(false);
   };
 
   /* ------------------------------------------------------------------
@@ -722,7 +756,7 @@ function Home() {
                   selectedAgentDetails?.name || "AI"
                 } anything...`}
                 className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                disabled={isProcessing}
+                // disabled={isProcessing}
               />
               <button
                 type="submit"
