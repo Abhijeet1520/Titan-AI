@@ -269,7 +269,7 @@ Below are the required output structures for each mode with additional explanato
    Example:
    {
      "mode": "GENERAL",
-     "message": "Hello! Here's a general response to assist you:",
+     "message": "<Your message here>",
    }
 
 Instructions:
