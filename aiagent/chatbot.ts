@@ -493,63 +493,16 @@ app.post("/api/chat", async (req, res) => {
     // Reset inactivity timer
     resetInactivityTimer(chatId);
 
-    // 1) Classify the user's message
-    const classificationPrompt = `
-      You will read the user's message and classify it into one of the following modes:
-      "requirements", "research", "development", "audit", "deployment", "general".
-      If requirements are not provided or clear then choose "requirements".
-      If research & requirements are not provided or clear then choose "research".
-      If research & requirements are clear and development is being told then choose "development".
-      So on and so forth.
-      Provide only the single word: requirements, research, development, audit, deployment, or general.
+    let specializedPrompt = `
+      ${BASE_INSTRUCTIONS}
+
+      You will read the user's message and first determine which of the following modes best applies:
+      (requirements, research, development, audit, deployment, or general).
+
+      Then produce the response strictly in that mode's format described above. If it's unclear, use "general".
 
       User message: "${trimmedUserMessage}"
     `;
-    const classificationStream = await session.agent.stream(
-      { messages: [new HumanMessage(classificationPrompt)] },
-      session.agentConfig
-    );
-    let classificationResponse = "";
-    for await (const chunk of classificationStream) {
-      if ("agent" in chunk) {
-        classificationResponse += chunk.agent.messages[0].content;
-      }
-    }
-    const rawMode = classificationResponse.trim().toLowerCase();
-    const allowedModes = ["requirements", "research", "development", "audit", "deployment", "general"];
-    const mode = allowedModes.includes(rawMode) ? rawMode : "general";
-
-    // After classification
-    logger.log({
-      chatId,
-      sender: 'SYSTEM',
-      message: `Message classified as: ${mode}`,
-      mode
-    });
-
-    // 2) Get specialized prompt and enhance it with context
-    let specializedPrompt = `${BASE_INSTRUCTIONS}\n`;
-
-    if (mode === "development") {
-      specializedPrompt += `
-You are a smart contract development expert.
-Please follow the "DEVELOPMENT" format.
-
-`;
-    } else if (mode === "requirements") {
-      specializedPrompt += `${PROMPT_REQUIREMENTS} - Please follow the "REQUIREMENTS" format.`;
-    } else if (mode === "research") {
-      specializedPrompt += `${PROMPT_RESEARCH} - Please follow the "RESEARCH" format.`;
-    } else if (mode === "audit") {
-      specializedPrompt += `${PROMPT_AUDIT} - Please follow the "AUDIT" format.`;
-    } else if (mode === "deployment") {
-      specializedPrompt += `${PROMPT_DEPLOYMENT} - Please follow the "DEPLOYMENT" format.`;
-    } else {
-      specializedPrompt += `${PROMPT_GENERAL} - Please follow the "GENERAL" format.`;
-    }
-
-    // Add user message at the end
-    specializedPrompt += `\n\nUser message: "${trimmedUserMessage}"`;
 
     // 3) Send to AI and collect response
     const agentStream = await session.agent.stream(
@@ -566,7 +519,7 @@ Please follow the "DEVELOPMENT" format.
     for await (const chunk of agentStream) {
       if ("agent" in chunk) {
         const content = chunk.agent.messages[0].content;
-
+        const usage = chunk.agent.messages[0]?.response_metadata?.tokenUsage;
         // Parse content for code blocks
         const lines = content.split('\n');
         for (const line of lines) {
@@ -582,11 +535,21 @@ Please follow the "DEVELOPMENT" format.
             responseText += line + '\n';
           }
         }
+
+        if (usage) {
+          logger.log({
+            chatId,
+            sender: 'AI',
+            message: `Token Usage: prompt=${usage.promptTokens}, completion=${usage.completionTokens}, total=${usage.totalTokens}`,
+            tokenUsage: usage
+          });
+        }
       } else if ("tools" in chunk) {
         responseText += `(TOOL-LOG) ${chunk.tools.messages[0].content}\n`;
       }
-      console.log(chunk);
     }
+    const mode = responseText.split('\n')[0]?.trim().toUpperCase() || 'GENERAL';
+
 
     // After AI response
     logger.log({

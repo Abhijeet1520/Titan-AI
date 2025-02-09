@@ -7,6 +7,12 @@ interface LogMessage {
   fileLog: string;
 }
 
+interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 class Logger {
   private logFile: string;
 
@@ -30,17 +36,21 @@ class Logger {
     mode?: string;
     userMessage?: string;
     status?: string;
+    tokenUsage?: TokenUsage;
   }): LogMessage {
     const timestamp = chalk.gray(`[${this.getTimestamp()}]`);
     const chatId = chalk.blue(`[ChatID: ${data.chatId}]`);
     const sender = chalk.yellow(`[${data.sender}]`);
     const mode = data.mode ? chalk.magenta(`[Mode: ${data.mode}]`) : '';
     const status = data.status ? chalk.green(`[Status: ${data.status}]`) : '';
+    const tokens = data.tokenUsage
+      ? chalk.cyan(`[Tokens: ${data.tokenUsage.totalTokens} (prompt:${data.tokenUsage.promptTokens}, completion:${data.tokenUsage.completionTokens})]`)
+      : '';
     const message = chalk.white(data.message);
 
     return {
-      consoleLog: `${timestamp} ${chatId} ${sender} ${mode} ${status}\n${message}\n`,
-      fileLog: `[${this.getTimestamp()}] [ChatID: ${data.chatId}] [${data.sender}] ${data.mode ? `[Mode: ${data.mode}]` : ''} ${data.status ? `[Status: ${data.status}]` : ''}\n${data.message}\n`
+      consoleLog: `${timestamp} ${chatId} ${sender} ${mode} ${status} ${tokens}\n${message}\n`,
+      fileLog: `[${this.getTimestamp()}] [ChatID: ${data.chatId}] [${data.sender}]${data.mode ? ' [Mode: '+data.mode+']' : ''}${data.status ? ' [Status: '+data.status+']' : ''}${data.tokenUsage ? ' [Tokens: '+data.tokenUsage.totalTokens+' (prompt:'+data.tokenUsage.promptTokens+', completion:'+data.tokenUsage.completionTokens+')]' : ''}\n${data.message}\n`
     };
   }
 
@@ -51,6 +61,7 @@ class Logger {
     mode?: string;
     userMessage?: string;
     status?: string;
+    tokenUsage?: TokenUsage;
   }): void {
     const formatted = this.formatLogMessage(data);
 
