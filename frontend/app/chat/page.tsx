@@ -32,6 +32,8 @@ import { chatModelsData } from "@/data/chatModels";
 import { defaultRequirements } from "@/data/defaultRequirements";
 import { bigDefiContract, readmeContent, deployConfig } from "@/data/contractTemplates";
 
+const chatApiUrl = process.env.NEXT_PUBLIC_CHAT_API_URL || "/api/chat";
+
 /* -------------------------------------------------------------------
   TYPES & INTERFACES
 ---------------------------------------------------------------------*/
@@ -136,17 +138,6 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
             </button>
           ))}
         </div>
-        {/* <div className="flex-shrink-0 border-l px-2">
-          <button
-            onClick={() =>
-              console.log("Add more settings for the editor if needed")
-            }
-            className="p-2 hover:bg-gray-100 rounded-lg"
-            title="Editor Settings"
-          >
-            <Settings className="w-4 h-4 text-gray-600" />
-          </button>
-        </div> */}
       </div>
 
       {/* Code Editor */}
@@ -191,6 +182,10 @@ function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState("0x1234...5678");
+  const [isSending, setIsSending] = useState(false);
+
+  // Track chatId for the API
+  const [chatId, setChatId] = useState<string>("");
 
   // Agents (multiple)
   const agents = agentsData;
@@ -206,12 +201,14 @@ function Home() {
   const [selectedModel, setSelectedModel] = useState("gpt-4");
 
   // Chat messages for each agent
-  const [agentMessages, setAgentMessages] = useState<{ [key: string]: Message[] }>({
-    research: [],
-    developer: [],
-    auditor: [],
-    deployment: []
-  });
+  const [agentMessages, setAgentMessages] = useState<{ [key: string]: Message[] }>(
+    {
+      research: [],
+      developer: [],
+      auditor: [],
+      deployment: []
+    }
+  );
 
   // Requirements & contract generation
   const [requirements, setRequirements] = useState<string[]>([]);
@@ -222,10 +219,10 @@ function Home() {
   const [files, setFiles] = useState<CodeFile[]>([]);
   const [latestSecurityChecks, setLatestSecurityChecks] = useState<string[]>([]);
 
-  // AI suggestions - stored for the latest AI response
+  // AI suggestions
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
 
-  // For toggling the Editor's fullscreen
+  // Editor Fullscreen
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Bottom Tabs: requirements, research, audit, deployment
@@ -338,6 +335,7 @@ function Home() {
     if (!input.trim()) return;
 
     setIsProcessing(true);
+    setIsSending(true);
     const agentId = selectedAgentId;
     const oldMessages = agentMessages[agentId] || [];
 
@@ -368,6 +366,42 @@ function Home() {
 
     // Simulate AI response delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    try {
+      // If no chatId yet, create one
+      let usedChatId = chatId;
+      if (!usedChatId) {
+        usedChatId = `chat-${Date.now()}`;
+        setChatId(usedChatId);
+      }
+
+      const response = await fetch(chatApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatId: usedChatId, userMessage: input })
+      });
+      const data = await response.json();
+
+      // Check the "mode" from the server response and update UI accordingly
+      if (data.mode === "requirements") {
+        setActiveBottomTab("requirements");
+      } else if (data.mode === "research") {
+        setActiveBottomTab("research");
+      } else if (data.mode === "audit") {
+        setActiveBottomTab("audit");
+      } else if (data.mode === "deployment") {
+        setActiveBottomTab("deployment");
+      } else {
+        // default to requirements or do nothing
+      }
+
+      console.log("Server returned mode:", data.mode);
+
+    } catch (error) {
+      console.error("Error sending message:", error);
+    } finally {
+      setIsSending(false);
+    }
 
     const aiMsg: Message = {
       id: oldMessages.length + 2,
@@ -409,7 +443,7 @@ function Home() {
   const selectedAgentDetails = agents.find((a) => a.id === selectedAgentId);
   const selectedProjectDetails = projectTypes.find((p) => p.id === selectedProject);
 
-  // SplitPane resizer styles (still possible to use a small px or your own classes)
+  // SplitPane resizer styles
   const verticalResizerStyle: React.CSSProperties = {
     width: "6px",
     background: "#e2eff0",
@@ -427,7 +461,7 @@ function Home() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col h-full w-full">
+    <div className="min-h-screen min-w-screen flex flex-col h-full w-full">
       {/* Top Bar: LLM dropdown + Wallet Connect */}
       <div className="h-14 flex items-center justify-between bg-white border-b px-6">
         <div className="flex items-center gap-4">
@@ -667,7 +701,6 @@ function Home() {
           className="h-full w-full"
           minSize="10%"
           maxSize="90%"
-          // style={{ position: isFullscreen ? "static" : "relative", flex: 1 }}
           resizerStyle={horizontalResizerStyle}
         >
 
