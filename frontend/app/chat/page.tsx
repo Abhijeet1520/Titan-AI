@@ -1,23 +1,15 @@
 "use client";
 import Editor from "@monaco-editor/react";
 import {
-  AlertCircle,
   Bot,
-  Brain,
   CheckCircle2,
   Clock,
-  Database,
   Download,
   FileCode,
   Fullscreen,
-  GitBranch,
-  Layout,
   Minimize,
   Plus,
   Send,
-  Settings,
-  Shield,
-  Terminal,
   Trash2,
   Wallet,
   Zap
@@ -31,7 +23,11 @@ import { agentsData } from "@/data/agents";
 import { projectTypesData } from "@/data/projectTypes";
 import { chatModelsData } from "@/data/chatModels";
 import { defaultRequirements } from "@/data/defaultRequirements";
-import { bigDefiContract, readmeContent, deployConfig } from "@/data/contractTemplates";
+import {
+  bigDefiContract,
+  readmeContent,
+  deployConfig
+} from "@/data/contractTemplates";
 
 const chatApiUrl = process.env.NEXT_PUBLIC_CHAT_API_URL || "/api/chat";
 
@@ -40,7 +36,7 @@ const chatApiUrl = process.env.NEXT_PUBLIC_CHAT_API_URL || "/api/chat";
 ---------------------------------------------------------------------*/
 interface Message {
   id: number;
-  content: string; // We'll store full JSON here or short text, whichever you prefer
+  content: string; // We'll store the entire JSON or short text
   sender: "user" | "ai";
   agentId: string; // which agent this message belongs to
   timestamp: Date;
@@ -213,12 +209,20 @@ function Home() {
   const [latestSecurityChecks, setLatestSecurityChecks] = useState<string[]>([]);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
 
-  // To store research/audit/deployment text if desired
+  // Storage from server data by mode:
+  // This is optional storage we can reflect in the UI or store persistently
+  const [requirementsData, setRequirementsData] = useState<any>({});
+  const [researchData, setResearchData] = useState<any>({});
+  const [developmentData, setDevelopmentData] = useState<any>({});
+  const [auditData, setAuditData] = useState<any>({});
+  const [deploymentData, setDeploymentData] = useState<any>({});
+
+  // For simpler UI reflection:
   const [researchOutput, setResearchOutput] = useState("");
   const [auditOutput, setAuditOutput] = useState("");
   const [deploymentOutput, setDeploymentOutput] = useState("");
 
-  // New state: suggested requirements
+  // Suggested Requirements
   const [suggestedRequirements, setSuggestedRequirements] = useState<
     Array<{ text: string; selected: boolean }>
   >([]);
@@ -232,10 +236,31 @@ function Home() {
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>("requirements");
 
   /* ------------------------------------------------------------------
-       Initialize default requirements
+       Load default requirements
   --------------------------------------------------------------------*/
   useEffect(() => {
     setRequirements(defaultRequirements);
+  }, []);
+
+  /* ------------------------------------------------------------------
+       Load from localStorage on mount (optional)
+  --------------------------------------------------------------------*/
+  useEffect(() => {
+    try {
+      const storedReq = localStorage.getItem("requirementsData");
+      const storedRes = localStorage.getItem("researchData");
+      const storedDev = localStorage.getItem("developmentData");
+      const storedAudit = localStorage.getItem("auditData");
+      const storedDeploy = localStorage.getItem("deploymentData");
+
+      if (storedReq) setRequirementsData(JSON.parse(storedReq));
+      if (storedRes) setResearchData(JSON.parse(storedRes));
+      if (storedDev) setDevelopmentData(JSON.parse(storedDev));
+      if (storedAudit) setAuditData(JSON.parse(storedAudit));
+      if (storedDeploy) setDeploymentData(JSON.parse(storedDeploy));
+    } catch (err) {
+      console.warn("Failed to parse localStorage data:", err);
+    }
   }, []);
 
   /* ------------------------------------------------------------------
@@ -244,6 +269,7 @@ function Home() {
   const handleConnectWallet = async () => {
     setIsProcessing(true);
     try {
+      // Simulate connecting...
       await new Promise((resolve) => setTimeout(resolve, 1000));
       setIsWalletConnected(true);
       setWalletAddress("0x1234...5678");
@@ -353,6 +379,8 @@ function Home() {
 
   /* ------------------------------------------------------------------
        handleSendMessage
+       - If user message is about "audit", "deploy", or "develop"
+         then we also send the current files & requirements in the request
   --------------------------------------------------------------------*/
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -360,6 +388,7 @@ function Home() {
 
     setIsProcessing(true);
     setIsSending(true);
+
     const agentId = selectedAgentId;
     const oldMessages = agentMessages[agentId] || [];
 
@@ -383,6 +412,32 @@ function Home() {
       status: "pending"
     };
 
+    // Decide if we attach 'files' or not:
+    // A quick, simple check: If the user typed "audit", "deploy", or "develop"
+    // or if the current bottom tab is "audit"/"deployment"/"requirements"/"development"
+    // you can adjust the logic as needed
+    let attachFiles = false;
+    let lowerInput = input.toLowerCase();
+    if (
+      lowerInput.includes("audit") ||
+      lowerInput.includes("deploy") ||
+      lowerInput.includes("develop")
+    ) {
+      attachFiles = true;
+    }
+
+    // We ALWAYS attach the "requirements" as context
+    const contextPayload: any = {
+      requirements
+    };
+    if (attachFiles) {
+      contextPayload.files = files.map((f) => ({
+        filename: f.name,
+        content: f.content,
+        language: f.language
+      }));
+    }
+
     setAgentMessages({
       ...agentMessages,
       [agentId]: [...oldMessages, userMsg, processingMsg]
@@ -396,22 +451,27 @@ function Home() {
         setChatId(usedChatId);
       }
 
+      // Send the request
       const response = await fetch(chatApiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chatId: usedChatId, userMessage: input })
+        body: JSON.stringify({
+          chatId: usedChatId,
+          userMessage: input,
+          context: contextPayload
+        })
       });
-      setInput("");
 
       const data = await response.json();
       const mode = data.mode as string || "GENERAL";
 
-      // ---- MAP THE RESPONSE TO YOUR UI BASED ON MODE ----
-      // We'll store the entire JSON as a string in the final AI message.
-      // Additionally, handle specialized fields if we want to update the bottom tabs.
-
+      // ---- STORE THE RESPONSE IN LOCALSTORAGE ----
       if (mode === "REQUIREMENTS") {
         setActiveBottomTab("requirements");
+
+        setRequirementsData(data); // Store entire data in state
+        localStorage.setItem("requirementsData", JSON.stringify(data));
+
         // If we get an array of requirements from the server, mark them as suggestions
         if (Array.isArray(data.requirements)) {
           setSuggestedRequirements(
@@ -421,15 +481,25 @@ function Home() {
             }))
           );
         }
+
       } else if (mode === "RESEARCH") {
         setActiveBottomTab("research");
-        // If there's a 'research' field, store it
-        setResearchOutput(
-          `**${data.message}**\n\n${data.overview || ""}\n\n${data.research || ""}`
-        );
+
+        setResearchData(data);
+        localStorage.setItem("researchData", JSON.stringify(data));
+
+        // If there's a 'research' field, store it in local UI state
+        const overview = data.overview || "";
+        const research = data.research || "";
+        setResearchOutput(`**${data.message}**\n\n${overview}\n\n${research}`);
+
       } else if (mode === "DEVELOPMENT") {
-        setActiveBottomTab("requirements"); // or "development" if you prefer a separate tab
-        // If there's a 'files' array in data, replace or merge with existing files
+        // If there's a 'files' array in data, we replace or merge
+        setActiveBottomTab("requirements"); // or your own logic if you prefer a separate dev tab
+
+        setDevelopmentData(data);
+        localStorage.setItem("developmentData", JSON.stringify(data));
+
         if (Array.isArray(data.files)) {
           const newFiles = data.files.map((f: any) => ({
             name: f.filename,
@@ -439,20 +509,37 @@ function Home() {
           }));
           setFiles(newFiles);
         }
+
       } else if (mode === "AUDIT") {
         setActiveBottomTab("audit");
+
+        setAuditData(data);
+        localStorage.setItem("auditData", JSON.stringify(data));
+
         // If there's a 'checks' field, show them in the UI
         if (Array.isArray(data.checks)) {
           setLatestSecurityChecks(data.checks);
         }
-        // Save the "message" in the audit output
+        // Also store data.message
         setAuditOutput(data.message || "Audit results below:");
+
       } else if (mode === "DEPLOYMENT") {
         setActiveBottomTab("deployment");
+
+        setDeploymentData(data);
+        localStorage.setItem("deploymentData", JSON.stringify(data));
+
         // If there's a 'transaction_url' or other fields, store them
-        setDeploymentOutput(
-          `${data.message}\n\nContract Address: ${data.contract_address}\nTransaction: ${data.transaction_url}`
-        );
+        const messagePart = data.message || "Deployment Info:";
+        const addressPart = data.contract_address
+          ? `\nContract Address: ${data.contract_address}`
+          : "";
+        const txPart = data.transaction_url
+          ? `\nTransaction URL: ${data.transaction_url}`
+          : "";
+
+        setDeploymentOutput(`${messagePart}${addressPart}${txPart}`);
+
       } else {
         // fallback for GENERAL
         setActiveBottomTab("requirements");
@@ -476,12 +563,13 @@ function Home() {
         ...agentMessages,
         [agentId]: [...oldMessages, userMsg, aiMsg]
       });
+
     } catch (error) {
       console.error("Error sending message:", error);
       // Show an error message in chat
       const errorMsg: Message = {
         id: oldMessages.length + 2,
-        content: `${String(error)}`,
+        content: `Error: ${String(error)}`,
         sender: "ai",
         agentId,
         timestamp: new Date(),
@@ -496,6 +584,7 @@ function Home() {
       setIsProcessing(false);
     }
 
+    setInput("");
   };
 
   /* ------------------------------------------------------------------
@@ -652,9 +741,7 @@ function Home() {
                         {message.sender === "user" ? (
                           <Zap className="w-4 h-4 text-blue-600" />
                         ) : (
-                          selectedAgentDetails?.icon ?? (
-                            <Bot className="w-4 h-4 text-gray-600" />
-                          )
+                          <Bot className="w-4 h-4 text-gray-600" />
                         )}
                       </div>
 
