@@ -266,12 +266,6 @@ Below are the required output structures for each mode with additional explanato
      - "mode": "GENERAL"
      - "message": A direct and helpful answer to the user's query.
 
-   Example:
-   {
-     "mode": "GENERAL",
-     "message": "<Your message here>",
-   }
-
 Instructions:
 - Analyze the user’s message and choose the best matching mode.
 - Provide your entire answer as valid JSON following the structures above.
