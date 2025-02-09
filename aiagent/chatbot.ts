@@ -20,6 +20,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import { logger } from './utils/logger';
 
 // Load environment variables
 dotenv.config();
@@ -302,10 +303,23 @@ app.post("/api/start-chat", async (req, res) => {
       inactivityTimer,
     };
 
+    logger.log({
+      chatId,
+      sender: 'SYSTEM',
+      message: 'New chat session started',
+      status: 'SUCCESS'
+    });
+
     console.log(`Created new session [${chatId}]. Active sessions: ${Object.keys(SESSIONS).length}`);
 
     return res.json({ message: `Session [${chatId}] created successfully!` });
   } catch (error) {
+    logger.log({
+      chatId: req.body.chatId || 'UNKNOWN',
+      sender: 'SYSTEM',
+      message: `Error: ${error}`,
+      status: 'ERROR'
+    });
     console.error("Error in /api/start-chat:", error);
     return res.status(500).json({ error: String(error) });
   }
@@ -323,6 +337,16 @@ app.post("/api/chat", async (req, res) => {
     if (!userMessage) {
       return res.status(400).json({ error: "Missing 'userMessage' in request body." });
     }
+
+    // limit userMessage to 5000 characters
+    const trimmedUserMessage = userMessage.slice(0, 5000);
+
+    // Log user message
+    logger.log({
+      chatId,
+      sender: 'USER',
+      message: userMessage
+    });
 
     // Check if session exists
     const session = SESSIONS[chatId];
@@ -345,7 +369,7 @@ app.post("/api/chat", async (req, res) => {
       So on and so forth.
       Provide only the single word: requirements, research, development, audit, deployment, or general.
 
-      User message: "${userMessage}"
+      User message: "${trimmedUserMessage}"
     `;
     const classificationStream = await session.agent.stream(
       { messages: [new HumanMessage(classificationPrompt)] },
@@ -360,6 +384,14 @@ app.post("/api/chat", async (req, res) => {
     const rawMode = classificationResponse.trim().toLowerCase();
     const allowedModes = ["requirements", "research", "development", "audit", "deployment", "general"];
     const mode = allowedModes.includes(rawMode) ? rawMode : "general";
+
+    // After classification
+    logger.log({
+      chatId,
+      sender: 'SYSTEM',
+      message: `Message classified as: ${mode}`,
+      mode
+    });
 
     // 2) Get specialized prompt and enhance it with context
     let specializedPrompt = "";
@@ -447,9 +479,28 @@ app.post("/api/chat", async (req, res) => {
       } else if ("tools" in chunk) {
         responseText += `(TOOL-LOG) ${chunk.tools.messages[0].content}\n`;
       }
+      console.log(chunk);
     }
 
-    // 5) Return a JSON response, including the mode
+    // After AI response
+    logger.log({
+      chatId,
+      sender: 'AI',
+      message: responseText,
+      mode,
+      status: 'COMPLETE'
+    });
+
+    if (codeBlocks.length > 0) {
+      logger.log({
+        chatId,
+        sender: 'AI',
+        message: `Generated ${codeBlocks.length} code blocks`,
+        mode: 'CODE'
+      });
+    }
+
+    // 5) Return structured response
     return res.json({
       mode,
       response: responseText.trim(),
@@ -462,6 +513,12 @@ app.post("/api/chat", async (req, res) => {
     });
 
   } catch (err) {
+    logger.log({
+      chatId: req.body.chatId || 'UNKNOWN',
+      sender: 'SYSTEM',
+      message: `Error: ${err}`,
+      status: 'ERROR'
+    });
     console.error("Error in /api/chat:", err);
     return res.status(500).json({ error: String(err) });
   }
