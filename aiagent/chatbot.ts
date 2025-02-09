@@ -2,6 +2,7 @@
  * server.ts
  ***************************************************/
 import express from "express";
+import cors from "cors";
 import {
   AgentKit,
   CdpWalletProvider,
@@ -26,6 +27,7 @@ import { logger } from './utils/logger';
 dotenv.config();
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -68,6 +70,138 @@ const PROMPT_GENERAL =
   process.env.GENERAL_PROMPT ||
   `
 The user has a general question. Provide a helpful response.
+`.trim();
+
+//-------------------------------------------------------
+// Base instructions for how to format each mode's output
+//-------------------------------------------------------
+const BASE_INSTRUCTIONS = `
+You must always format your responses according to the Mode:
+1) REQUIREMENTS
+    Start with "REQUIREMENTS" at the top.
+    Then the project name, followed by a brief description.
+    Then list items line by line, for example:
+    REQUIREMENTS
+    Project: My Project
+    - Requirement 1
+    - Requirement 2
+
+2) DEVELOPMENT
+    Start with "DEVELOPMENT" at the top.
+    First, return a list of file names.
+    Then for each file, provide its contents in code blocks. for example:
+    DEVELOPMENT
+    DeFi Protocol: My Project
+    Files: 3
+      - File 1: contract.sol
+      - File 2: README.md
+      - File 3: config.json
+
+    File 1: contract.sol
+    \`\`\`sol
+    // SPDX-License-Identifier: MIT
+    pragma solidity ^0.8.0;
+    contract MyContract {
+      // Your contract code here
+    }
+    \`\`\`
+
+    File 2: README.md
+    \`\`\`md
+    # DeFi Protocol - My Project
+    <A brief description of the project>
+
+    ## Requirements
+    - Requirement 1
+    - Requirement 2
+    \`\`\`
+
+    File 3: config.json
+    \`\`\`json
+    {
+      "network": "mainnet",
+      "address": "0x1234567890abcdef"
+    }
+    \`\`\`
+
+3) RESEARCH
+    Start with "RESEARCH" at the top.
+    Provide your findings in bullet points. for example:
+    RESEARCH
+    DeFi Protocol Analysis: Medium-High complexity staking or yield strategies
+    Research: High Complexity
+    Key Features: 3
+      -Multi-token Support
+      -Yield Optimization
+      -Flash Loans
+    Market Analysis:
+      <div class="space-y-4">
+      <div>
+        <h4 class="font-medium text-gray-900 mb-2">
+          Market Size
+        </h4>
+        <div class="bg-gray-100 rounded-lg p-3">
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-600">Current TVL</span>
+            <span class="font-medium">$1.2B</span>
+          </div>
+          <div class="flex items-center justify-between text-sm mt-2">
+            <span class="text-gray-600">Growth Rate</span>
+            <span class="font-medium text-green-600">+15% MoM</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h4 class="font-medium text-gray-900 mb-2">Competition</h4>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
+            <span>Aave</span>
+            <span class="font-medium">32% Market Share</span>
+          </div>
+          <div class="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
+            <span>Compound</span>
+            <span class="font-medium">28% Market Share</span>
+          </div>
+          <div class="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
+            <span>Others</span>
+            <span class="font-medium">40% Market Share</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    Risk Analysis: 3
+    - High Risk:Smart contract vulnerabilities
+    - Medium Risk:Market volatility impact
+    - Low Risk:Regulatory compliance (with KYC)
+
+4) AUDIT
+    Start with "AUDIT" at the top.
+    Provide security analysis in bullet points. for example:
+    AUDIT
+    - Checks: 3
+    Test 1: ✓ ReentrancyGuard implemented on state-changing functions
+    Status 1: Pass
+    Test 2: ✓ Proper access control with Ownable
+    Status 2: Pass
+    Test 3: ✗ SafeMath library not used
+    Status 3: Fail
+    Recommendations for 3: 2
+    - Implement SafeMath library
+    - Use OpenZeppelin contracts
+
+5) DEPLOYMENT
+    Start with "DEPLOYMENT" at the top.
+    Provide steps and pointers in bullet points. for example:
+    DEPLOYMENT
+    - Deployment Steps: 3
+    Step 1: Compile the contracts
+    Step 2: Deploy the contracts to the testnet
+    Step 3: Test the contracts
+    Should I deploy to the testnet or mainnet?
+
+6) GENERAL
+   Start with "GENERAL" at the top.
+   Provide general insights or answers.
 `.trim();
 
 //-------------------------------------------------------
@@ -134,7 +268,7 @@ async function createNewAgent(): Promise<{
 
   // 2) Initialize the LLM
   const llm = new ChatOpenAI({
-    model: "gpt-4o-mini",
+    model: "gpt-4o",
     temperature: 0.7,
   });
 
@@ -194,11 +328,11 @@ async function createNewAgent(): Promise<{
     llm,
     tools,
     checkpointSaver: memory,
-    messageModifier: `
-      You are a helpful agent that can interact onchain using the Coinbase Developer Platform (CDP) AgentKit.
-      If you ever need funds, you can request them from a faucet if on 'base-sepolia'.
-      If you cannot do something with the current tools, politely explain that it is not supported.
-    `,
+    // Insert the base instructions at the start
+    messageModifier: `${BASE_INSTRUCTIONS}\n\nYou are a helpful agent that can interact onchain using the Coinbase Developer Platform (CDP) AgentKit.
+If you ever need funds, you can request them from a faucet if on 'base-sepolia'.
+If you cannot do something with the current tools, politely explain that it is not supported.
+`,
   });
 
   // 10) Export wallet data so we can persist it
@@ -394,56 +528,28 @@ app.post("/api/chat", async (req, res) => {
     });
 
     // 2) Get specialized prompt and enhance it with context
-    let specializedPrompt = "";
+    let specializedPrompt = `${BASE_INSTRUCTIONS}\n`;
+
     if (mode === "development") {
-      specializedPrompt = `You are a smart contract development expert.
-      Based on the user's request, provide:
-      1. A complete, working smart contract implementation
-      2. Detailed code comments explaining key functionality
-      3. Security considerations and best practices used
-      4. Any relevant deployment notes
+      specializedPrompt += `
+You are a smart contract development expert.
+Please follow the "DEVELOPMENT" format.
 
-      Here are some guidelines:
-      - Use Solidity ^0.8.0
-      - Include proper SPDX license identifier
-      - Implement reentrancy protection
-      - Add events for important state changes
-      - Use require statements for input validation
-      - Follow ERC standards where applicable
-
-      User request: "${userMessage}"
-
-      Format your response with:
-      1. Brief explanation of implementation
-      2. Complete code in a code block (use \`\`\`)
-      3. Security notes and considerations
-      `;
+`;
     } else if (mode === "requirements") {
-      specializedPrompt = `${PROMPT_REQUIREMENTS}
-      Your task: Analyze requirements and provide:
-      1. List of validated requirements
-      2. Suggested security features
-      3. Any missing critical requirements`;
+      specializedPrompt += `${PROMPT_REQUIREMENTS} - Please follow the "REQUIREMENTS" format.`;
     } else if (mode === "research") {
-      specializedPrompt = `${PROMPT_RESEARCH}`;
+      specializedPrompt += `${PROMPT_RESEARCH} - Please follow the "RESEARCH" format.`;
     } else if (mode === "audit") {
-      specializedPrompt = `${PROMPT_AUDIT}
-      Your task: Perform security analysis:
-      1. List potential vulnerabilities
-      2. Suggest security improvements
-      3. Review any critical sections`;
+      specializedPrompt += `${PROMPT_AUDIT} - Please follow the "AUDIT" format.`;
     } else if (mode === "deployment") {
-      specializedPrompt = `${PROMPT_DEPLOYMENT}
-      Your task: Guide deployment process:
-      1. Deployment steps and checklist
-      2. Configuration requirements
-      3. Post-deployment verification`;
+      specializedPrompt += `${PROMPT_DEPLOYMENT} - Please follow the "DEPLOYMENT" format.`;
     } else {
-      specializedPrompt = PROMPT_GENERAL;
+      specializedPrompt += `${PROMPT_GENERAL} - Please follow the "GENERAL" format.`;
     }
 
     // Add user message at the end
-    specializedPrompt += `\n\nUser message: "${userMessage}"`;
+    specializedPrompt += `\n\nUser message: "${trimmedUserMessage}"`;
 
     // 3) Send to AI and collect response
     const agentStream = await session.agent.stream(
