@@ -457,11 +457,34 @@ app.post("/api/chat", async (req, res) => {
     });
 
     // Check if session exists
-    const session = SESSIONS[chatId];
+    let session = SESSIONS[chatId];
     if (!session) {
-      // Potentially check the queue here to see if we can now create it
-      // if a spot is open, etc. For simplicity, just error out.
-      return res.status(404).json({ error: `No active session found for chatId = ${chatId}.` });
+      const activeCount = Object.keys(SESSIONS).length;
+      if (activeCount >= MAX_ACTIVE_SESSIONS) {
+        console.log(`Active sessions = ${activeCount}, pushing chat [${chatId}] to queue.`);
+        QUEUE.push({ chatId });
+        return res.json({ message: `Queue is full (${MAX_ACTIVE_SESSIONS}). Your request has been queued.` });
+      }
+
+      const { agent, agentConfig } = await createNewAgent();
+      const inactivityTimer = setTimeout(() => {
+        cleanupSession(chatId);
+      }, SESSION_INACTIVITY_MS);
+
+      SESSIONS[chatId] = {
+        agent,
+        agentConfig,
+        lastActive: Date.now(),
+        inactivityTimer,
+      };
+      session = SESSIONS[chatId];
+
+      logger.log({
+        chatId,
+        sender: 'SYSTEM',
+        message: 'Created new chat session automatically for /api/chat request',
+        status: 'SUCCESS'
+      });
     }
 
     // Reset inactivity timer
