@@ -172,10 +172,7 @@ const MultiFileEditor: React.FC<MultiFileEditorProps> = ({
 
 /* -------------------------------------------------------------------
   MAIN APP COMPONENT
-  - Top bar with LLM dropdown and wallet
-  - Left: Chat
-  - Right: Editor on top, bottom has tabs (Requirements, Research, etc.)
-  - Draggable/resizable using SplitPane
+  - Minimal changes to handle "requirements" and other modes with improved UI
 ---------------------------------------------------------------------*/
 function Home() {
   // State declarations
@@ -202,14 +199,12 @@ function Home() {
   const [selectedModel, setSelectedModel] = useState("gpt-4");
 
   // Chat messages for each agent
-  const [agentMessages, setAgentMessages] = useState<{ [key: string]: Message[] }>(
-    {
-      research: [],
-      developer: [],
-      auditor: [],
-      deployment: []
-    }
-  );
+  const [agentMessages, setAgentMessages] = useState<{ [key: string]: Message[] }>({
+    research: [],
+    developer: [],
+    auditor: [],
+    deployment: []
+  });
 
   // Requirements & contract generation
   const [requirements, setRequirements] = useState<string[]>([]);
@@ -219,32 +214,37 @@ function Home() {
   // Editor + Security analysis
   const [files, setFiles] = useState<CodeFile[]>([]);
   const [latestSecurityChecks, setLatestSecurityChecks] = useState<string[]>([]);
-
-  // AI suggestions
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+
+  // To store research/audit/deployment text if desired
+  const [researchOutput, setResearchOutput] = useState("");
+  const [auditOutput, setAuditOutput] = useState("");
+  const [deploymentOutput, setDeploymentOutput] = useState("");
+
+  // New state: suggested requirements with checkbox selection
+  const [suggestedRequirements, setSuggestedRequirements] = useState<Array<{ text: string; selected: boolean }>>([]);
 
   // Editor Fullscreen
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Bottom Tabs: requirements, research, audit, deployment
+  // Bottom Tabs
   const bottomTabs = ["requirements", "research", "audit", "deployment"] as const;
   type BottomTab = typeof bottomTabs[number];
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>("requirements");
 
   /* ------------------------------------------------------------------
-       generateContract: Create mock contract & populate editor
+       generateContract
   --------------------------------------------------------------------*/
   useEffect(() => {
     setRequirements(defaultRequirements);
   }, []);
 
   /* ------------------------------------------------------------------
-       handleConnectWallet: Simulate connecting a user wallet
+       handleConnectWallet
   --------------------------------------------------------------------*/
   const handleConnectWallet = async () => {
     setIsProcessing(true);
     try {
-      // Simulated wallet connection
       await new Promise((resolve) => setTimeout(resolve, 1000));
       setIsWalletConnected(true);
       setWalletAddress("0x1234...5678");
@@ -272,20 +272,44 @@ function Home() {
     generateContract(updated);
   };
 
+  // New function: toggle checkbox for suggested requirement
+  const handleToggleSuggestion = (index: number) => {
+    const updated = suggestedRequirements.map((item, idx) => {
+      if (idx === index) {
+        return { ...item, selected: !item.selected };
+      }
+      return item;
+    });
+    setSuggestedRequirements(updated);
+  };
+
+  // New function: add selected suggested requirements to current requirements
+  const handleAddSelectedSuggestions = () => {
+    const toAdd = suggestedRequirements.filter(item => item.selected).map(item => item.text);
+    if (toAdd.length) {
+      setRequirements(prev => [...prev, ...toAdd]);
+      setSuggestedRequirements([]);
+    }
+  };
+
   /* ------------------------------------------------------------------
-       generateContract: Create mock contract & populate editor
+       generateContract
   --------------------------------------------------------------------*/
   const generateContract = (reqs?: string[]) => {
     const finalReqs = reqs || requirements;
-    const bigContract = bigDefiContract
-      .replace("// ...the big solidity contract string...", "SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n// ...rest of contract...");
-    // We use the other templates for the readme and deployment config
-    const readme = readmeContent
-      .replace("// ...the markdown README content...", "## Implementation details\n// ...rest of README...");
-    const deployConf = deployConfig
-      .replace("// ...the deployment configuration string...", "// Custom deployment instructions here");
+    const bigContract = bigDefiContract.replace(
+      "// ...the big solidity contract string...",
+      "SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n// ...rest of contract..."
+    );
+    const readme = readmeContent.replace(
+      "// ...the markdown README content...",
+      "## Implementation details\n// ...rest of README..."
+    );
+    const deployConf = deployConfig.replace(
+      "// ...the deployment configuration string...",
+      "// Custom deployment instructions here"
+    );
 
-    // Additional files for the editor
     const initialFiles: CodeFile[] = [
       {
         name: "MyAdvancedDeFi.sol",
@@ -477,7 +501,7 @@ function Home() {
   };
 
   return (
-    <div className="min-h-screen min-w-screen flex flex-col h-full w-full">
+    <div className="h-screen w-screen min-h-screen min-w-screen flex flex-col h-full w-full">
       {/* Top Bar: LLM dropdown + Wallet Connect */}
       <div className="h-14 flex items-center justify-between bg-white border-b px-6">
         <div className="flex items-center gap-4">
@@ -554,7 +578,7 @@ function Home() {
         style={{ position: "relative", flex: 1 }}
       >
         {/* LEFT: Chat Panel */}
-        <div className="flex flex-col h-full overflow-y-scroll overflow-x-hidden">
+        <div className="flex flex-col w-full h-full overflow-y-auto">
           {/* Agent selection */}
           <div className="flex gap-2 p-3 border-b bg-gray-50">
             {agents.map((agent) => (
@@ -619,9 +643,9 @@ function Home() {
                             </div>
                           ) : (
                             <>
-                              <p className="text-sm lg:text-base">
+                              <pre className="text-sm lg:text-base overflow-x-auto whitespace-pre-wrap">
                                 {message.content}
-                              </p>
+                              </pre>
                               {message.codeBlocks?.length ? (
                                 <div className="mt-3 space-y-2">
                                   {message.codeBlocks.map((block, idx) => (
@@ -853,6 +877,9 @@ function Home() {
                   <h2 className="text-lg font-semibold mb-3">
                     Audit &amp; Security Analysis
                   </h2>
+                  <div className="text-sm text-gray-600 mb-3 whitespace-pre-wrap">
+                    {auditOutput}
+                  </div>
                   <p className="text-sm text-gray-500 mb-3">
                     Below are the latest security checks:
                   </p>
@@ -883,6 +910,9 @@ function Home() {
               {activeBottomTab === "deployment" && (
                 <div>
                   <h2 className="text-lg font-semibold mb-3">Deployment</h2>
+                  <div className="text-sm text-gray-600 mb-3 whitespace-pre-wrap">
+                    {deploymentOutput}
+                  </div>
                   <p className="text-sm text-gray-600">
                     (Placeholder) Prepare final deployment steps here.
                   </p>
