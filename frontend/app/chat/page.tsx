@@ -25,6 +25,7 @@ import {
 import React, { useEffect, useState } from "react";
 import SplitPane from "react-split-pane";
 import Image from "next/image";
+import ReactMarkdown from "react-markdown";
 
 import { agentsData } from "@/data/agents";
 import { projectTypesData } from "@/data/projectTypes";
@@ -380,45 +381,60 @@ function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatId: usedChatId, userMessage: input })
       });
+      console.log("Sent message to server:", input);
+      console.log("Server response:", response);
       const data = await response.json();
+      const mode = data.mode;
 
-      // Check the "mode" from the server response and update UI accordingly
-      if (data.mode === "requirements") {
+      // Update UI based on the mode
+      if (mode === "requirements") {
         setActiveBottomTab("requirements");
-      } else if (data.mode === "research") {
+        // Parse bullet lines from data.response as suggestions
+        const lines = data.response.split("\n").map((l: string) => l.trim());
+        const newReqs = lines
+          .filter((l: string) => l.startsWith("- "))
+          .map((l: string) => l.substring(2));
+        if (newReqs.length) {
+          // Store as suggested requirements with unchecked state
+          setSuggestedRequirements(newReqs.map(text => ({ text, selected: false })));
+        }
+      } else if (mode === "research") {
         setActiveBottomTab("research");
-      } else if (data.mode === "audit") {
+        setResearchOutput(data.response || "");
+      } else if (mode === "audit") {
         setActiveBottomTab("audit");
-      } else if (data.mode === "deployment") {
+        setAuditOutput(data.response || "");
+      } else if (mode === "deployment") {
         setActiveBottomTab("deployment");
+        setDeploymentOutput(data.response || "");
       } else {
-        // default to requirements or do nothing
+        // do nothing or set defaults
       }
 
-      console.log("Server returned mode:", data.mode);
+      console.log("Server returned mode:", mode);
 
+      // AI "final" message in chat
+      const aiMsg: Message = {
+        id: oldMessages.length + 2,
+        content: data.response,
+        sender: "ai",
+        agentId,
+        timestamp: new Date(),
+        codeBlocks: [generatedContract],
+        securityChecks: latestSecurityChecks,
+        aiSuggestions: aiSuggestions,
+        status: "complete"
+      };
+
+      setAgentMessages({
+        ...agentMessages,
+        [agentId]: [...oldMessages, userMsg, aiMsg]
+      });
     } catch (error) {
       console.error("Error sending message:", error);
     } finally {
       setIsSending(false);
     }
-
-    const aiMsg: Message = {
-      id: oldMessages.length + 2,
-      content: `Here's an updated implementation based on your request. (Using ${selectedModel})`,
-      sender: "ai",
-      agentId,
-      timestamp: new Date(),
-      codeBlocks: [generatedContract],
-      securityChecks: latestSecurityChecks,
-      aiSuggestions: aiSuggestions,
-      status: "complete"
-    };
-
-    setAgentMessages({
-      ...agentMessages,
-      [agentId]: [...oldMessages, userMsg, aiMsg]
-    });
 
     setInput("");
     setIsProcessing(false);
@@ -560,110 +576,114 @@ function Home() {
 
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto">
-            <div className="w-full p-3 space-y-3 w-max-[100] overflow-y-scroll">
-              {currentAgentChats.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex items-start gap-3 ${
-                    message.sender === "user" ? "flex-row-reverse" : ""
-                  }`}
-                >
-                  <div
-                    className={`flex-shrink-0 rounded-full flex items-center justify-center w-10 h-10 ${
-                      message.sender === "user" ? "bg-blue-100" : "bg-gray-100"
-                    }`}
-                  >
-                    {message.sender === "user" ? (
-                      <Zap className="w-4 h-4 text-blue-600" />
-                    ) : (
-                      selectedAgentDetails?.icon ?? (
-                        <Bot className="w-4 h-4 text-gray-600" />
-                      )
-                    )}
-                  </div>
-
-                  <div
-                    className={`flex-1 max-w-[80%] ${
-                      message.status === "pending" ? "opacity-70" : ""
-                    }`}
-                  >
+            <div className="w-full p-3 space-y-3 w-max-[100]">
+              <div className="flex-1 flex flex-col bg-white">
+                <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                  {currentAgentChats.map((message) => (
                     <div
-                      className={`p-3 rounded-2xl ${
-                        message.sender === "user"
-                          ? "bg-blue-500 text-white ml-auto"
-                          : "bg-white border shadow-sm"
+                      key={message.id}
+                      className={`flex items-start gap-3 ${
+                        message.sender === "user" ? "flex-row-reverse" : ""
                       }`}
                     >
-                      {message.status === "pending" ? (
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 animate-spin" />
-                          <span>{message.content}</span>
+                      <div
+                        className={`flex-shrink-0 rounded-full flex items-center justify-center w-10 h-10 ${
+                          message.sender === "user" ? "bg-blue-100" : "bg-gray-100"
+                        }`}
+                      >
+                        {message.sender === "user" ? (
+                          <Zap className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          selectedAgentDetails?.icon ?? (
+                            <Bot className="w-4 h-4 text-gray-600" />
+                          )
+                        )}
+                      </div>
+
+                      <div
+                        className={`flex-1 max-w-[80%] ${
+                          message.status === "pending" ? "opacity-70" : ""
+                        }`}
+                      >
+                        <div
+                          className={`p-3 rounded-2xl ${
+                            message.sender === "user"
+                              ? "bg-blue-500 text-white ml-auto"
+                              : "bg-white border shadow-sm"
+                          }`}
+                        >
+                          {message.status === "pending" ? (
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 animate-spin" />
+                              <span>{message.content}</span>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm lg:text-base">
+                                {message.content}
+                              </p>
+                              {message.codeBlocks?.length ? (
+                                <div className="mt-3 space-y-2">
+                                  {message.codeBlocks.map((block, idx) => (
+                                    <pre
+                                      key={idx}
+                                      className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs lg:text-sm overflow-x-auto"
+                                    >
+                                      {block}
+                                    </pre>
+                                  ))}
+                                </div>
+                              ) : null}
+
+                              {/* AI suggestions / security checks */}
+                              {message.securityChecks?.length ? (
+                                <div className="mt-3 space-y-1.5">
+                                  {message.securityChecks.map((check, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-2 text-sm text-gray-700"
+                                    >
+                                      <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                      <span>{check}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+
+                              {message.aiSuggestions?.length ? (
+                                <div className="mt-3 space-y-1.5">
+                                  {message.aiSuggestions.map((sug, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-2 text-sm text-blue-700"
+                                    >
+                                      <Zap className="w-5 h-5" />
+                                      <span>{sug}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </>
+                          )}
                         </div>
-                      ) : (
-                        <>
-                          <p className="text-sm lg:text-base">
-                            {message.content}
-                          </p>
-                          {message.codeBlocks?.length ? (
-                            <div className="mt-3 space-y-2">
-                              {message.codeBlocks.map((block, idx) => (
-                                <pre
-                                  key={idx}
-                                  className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs lg:text-sm overflow-x-auto"
-                                >
-                                  {block}
-                                </pre>
-                              ))}
-                            </div>
-                          ) : null}
-
-                          {/* AI suggestions / security checks */}
-                          {message.securityChecks?.length ? (
-                            <div className="mt-3 space-y-1.5">
-                              {message.securityChecks.map((check, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center gap-2 text-sm text-gray-700"
-                                >
-                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                  <span>{check}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-
-                          {message.aiSuggestions?.length ? (
-                            <div className="mt-3 space-y-1.5">
-                              {message.aiSuggestions.map((sug, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center gap-2 text-sm text-blue-700"
-                                >
-                                  <Zap className="w-5 h-5" />
-                                  <span>{sug}</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                        </>
-                      )}
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
-                      {message.sender === "ai" && selectedAgentDetails && (
-                        <>
-                          <span className="font-medium">
-                            {selectedAgentDetails.name}
+                        <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
+                          {message.sender === "ai" && selectedAgentDetails && (
+                            <>
+                              <span className="font-medium">
+                                {selectedAgentDetails.name}
+                              </span>
+                              <span>•</span>
+                            </>
+                          )}
+                          <span>
+                            {new Date(message.timestamp).toLocaleTimeString()}
                           </span>
-                          <span>•</span>
-                        </>
-                      )}
-                      <span>
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
 
@@ -769,6 +789,30 @@ function Home() {
                       ))}
                     </ul>
                   )}
+                  {suggestedRequirements.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-md font-semibold mb-2">Suggested Requirements</h3>
+                      <ul className="space-y-2">
+                        {suggestedRequirements.map((item, idx) => (
+                          <li key={idx} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={item.selected}
+                              onChange={() => handleToggleSuggestion(idx)}
+                              className="h-4 w-4"
+                            />
+                            <span className="text-sm">{item.text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        onClick={handleAddSelectedSuggestions}
+                        className="mt-2 bg-green-500 text-white px-3 py-1 rounded-md text-sm"
+                      >
+                        Add Selected
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -778,7 +822,9 @@ function Home() {
                   <h2 className="text-lg font-semibold mb-3">
                     {selectedProjectDetails?.name} Analysis
                   </h2>
-
+                  <div className="prose prose-sm text-gray-600 mb-3">
+                    <ReactMarkdown>{researchOutput}</ReactMarkdown>
+                  </div>
                   <div className="flex items-center justify-between mb-6">
                     <span className="text-gray-700">
                       {selectedProjectDetails?.description}
@@ -797,143 +843,6 @@ function Home() {
                     >
                       {selectedProjectDetails?.complexity} Complexity
                     </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    <div className="bg-white rounded-xl shadow-sm border p-6">
-                      <h3 className="text-md font-semibold mb-4">
-                        Key Features
-                      </h3>
-                      <ul className="space-y-2">
-                        {selectedProjectDetails?.features.map((feature, idx) => (
-                          <li
-                            key={idx}
-                            className="flex items-center gap-2 text-gray-700"
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-green-500" />
-                            <span>{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="bg-white rounded-xl shadow-sm border p-6">
-                      <h3 className="text-md font-semibold mb-4">
-                        Market Analysis
-                      </h3>
-                      <div className="space-y-4">
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-2">
-                            Market Size
-                          </h4>
-                          <div className="bg-gray-100 rounded-lg p-3">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-gray-600">Current TVL</span>
-                              <span className="font-medium">$1.2B</span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm mt-2">
-                              <span className="text-gray-600">Growth Rate</span>
-                              <span className="font-medium text-green-600">
-                                +15% MoM
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-2">
-                            Competition
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
-                              <span>Aave</span>
-                              <span className="font-medium">
-                                32% Market Share
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
-                              <span>Compound</span>
-                              <span className="font-medium">
-                                28% Market Share
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-2">
-                              <span>Others</span>
-                              <span className="font-medium">
-                                40% Market Share
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
-                    <h3 className="text-md font-semibold mb-4">Risk Analysis</h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 p-3 bg-red-50 text-red-700 rounded-lg">
-                        <AlertCircle className="w-5 h-5" />
-                        <div>
-                          <span className="font-medium">High Risk:</span>
-                          <span className="ml-1">
-                            Smart contract vulnerabilities
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-yellow-50 text-yellow-700 rounded-lg">
-                        <AlertCircle className="w-5 h-5" />
-                        <div>
-                          <span className="font-medium">Medium Risk:</span>
-                          <span className="ml-1">Market volatility impact</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-green-50 text-green-700 rounded-lg">
-                        <CheckCircle2 className="w-5 h-5" />
-                        <div>
-                          <span className="font-medium">Low Risk:</span>
-                          <span className="ml-1">
-                            Regulatory compliance (with KYC)
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-xl shadow-sm border p-6">
-                    <h3 className="text-md font-semibold mb-4">
-                      Development Timeline
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">
-                          Phase 1: Smart Contract Development
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-1">2-3 weeks</p>
-                      </div>
-                      <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">
-                          Phase 2: Security Audit
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-1">2 weeks</p>
-                      </div>
-                      <div className="relative pl-8 pb-8 border-l-2 border-blue-200">
-                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">
-                          Phase 3: Frontend Development
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-1">3-4 weeks</p>
-                      </div>
-                      <div className="relative pl-8">
-                        <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500" />
-                        <h4 className="font-medium text-gray-900">
-                          Phase 4: Testing & Deployment
-                        </h4>
-                        <p className="text-sm text-gray-600 mt-1">1-2 weeks</p>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
