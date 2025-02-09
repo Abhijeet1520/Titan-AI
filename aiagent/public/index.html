@@ -40,6 +40,7 @@
             margin: 10px 0;
             padding: 10px;
             border-radius: 5px;
+            text-wrap: auto;
         }
         .user-message {
             background-color: #e9ecef;
@@ -83,7 +84,7 @@
                 await startChat();
             }
 
-            const messageDiv = document.createElement('div');
+            const messageDiv = document.createElement('pre');
             messageDiv.className = 'message user-message';
             messageDiv.textContent = message;
             chatContainer.appendChild(messageDiv);
@@ -96,7 +97,7 @@
                 });
                 const data = await response.json();
 
-                const botMessageDiv = document.createElement('div');
+                const botMessageDiv = document.createElement('pre');
                 botMessageDiv.className = 'message bot-message';
                 botMessageDiv.textContent = data.response;
                 chatContainer.appendChild(botMessageDiv);
