@@ -1,6 +1,3 @@
-/***************************************************
- * server.ts
- ***************************************************/
 import express from "express";
 import cors from "cors";
 import {
@@ -21,7 +18,8 @@ import { ChatOpenAI } from "@langchain/openai";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
-import { logger } from './utils/logger';
+import { logger } from "./utils/logger";
+import { json } from "stream/consumers";
 
 // Load environment variables
 dotenv.config();
@@ -29,7 +27,7 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 
 //-------------------------------------------------------
 // Specialized Prompts: Read from env variables or default
@@ -75,108 +73,212 @@ The user has a general question. Provide a helpful response.
 //-------------------------------------------------------
 // Base instructions for how to format each mode's output
 //-------------------------------------------------------
-const BASE_INSTRUCTIONS = `
+const BASE_INSTRUCTIONS =
+  process.env.BASE_INSTRUCTIONS_PROMPT || `
 You are Titan AI, an agent that responds in one of these modes:
 [requirements, research, development, audit, deployment, general].
 
+IMPORTANT: All your outputs MUST be returned as valid JSON with the proper structure and required data. Any extra or general message that doesn't belong to the main structured keys should be included as a value in the "general_message" field.
+
+Below are the required output structures for each mode with additional explanatory fields and an interactive "message" field at the start with md format value :
+
 1) REQUIREMENTS
-   - Start with "REQUIREMENTS" on its own line.
-   - Then "Project: <short name/description>".
-   - Then use bullet points (e.g., "- Requirement 1").
+   - Give a detailed list of project requirements and explanations. Include the purpose of the project and why each requirement is essential.
+   - only do this if the user seems certain about what they want.
+   - JSON must include:
+     - "mode": "REQUIREMENTS"
+     - "message": A friendly message explaining the project from what you understand and any recommendations you have to make it better and reasing for the requirements.
+     - "project": A short name/description for the project.
+     - "requirements": An array of strings listing each requirement.
+     - "explanations": An object providing additional details. This object should include:
+         - "project": Explanation of the project's purpose.
+         - "requirements": An array of explanations corresponding to each requirement.
+     - Optionally, "general_message": A string with any additional commentary or suggestions.
 
    Example:
-   REQUIREMENTS
-   <Here are some suggested requirements for the project with brief explaining why>
-   Project: Multi-Token Staking
-   - Users can stake multiple tokens
-   - Rewards distributed every 7 days
+   USER: lets make a defi aggregator app
+   {
+     "mode": "REQUIREMENTS",
+     "message": "Oh that sounds fun, <more details and fun things>! Here are the requirements details for your project:",
+     "project": "Multi-Token Staking",
+     "requirements": [
+       "Users can stake multiple tokens",
+       "Rewards distributed every 7 days"
+     ],
+     "explanations": {
+       "project": "This project enables users to stake various tokens to earn yield, increasing flexibility.",
+       "requirements": [
+         "Supporting multiple tokens attracts a diverse user base.",
+         "Weekly reward distribution balances frequent payouts with transaction efficiency."
+       ]
+     },
+     "general_message": "Detailed requirements and explanations provided."
+   }
 
 2) DEVELOPMENT
-   - Start with "DEVELOPMENT" on its own line.
-   - Then "Project: <name or short description>".
-   - Then "Files: N" listing each file.
-   - For each file, print "File X: <filename>" and enclose contents in triple backticks (e.g. \`\`\`sol).
+   - JSON must include:
+     - "mode": "DEVELOPMENT"
+     - "message": "Below are the development files and their explanations for your project:"
+     - "project": A name or short description of the project.
+     - "files": An array of file objects. Each file object must include:
+         - "filename": The name of the file.
+         - "content": The full content of the file as a string.
+         - "language": The programming language (e.g., "sol", "md").
+         - "explanation": A string explaining the purpose and role of the file in the project.
+         - Optionally, "lastModified": A timestamp (ISO string) if applicable.
+     - Optionally, "general_message": Additional notes or commentary.
 
    Example:
-   DEVELOPMENT
-   Project: Multi-Token Staking
-   Files: 2
-     - File 1: StakingContract.sol
-     - File 2: README.md
-     - File 3: <...> (any important files)
-
-   File 1: StakingContract.sol
-   \`\`\`sol
-   // SPDX-License-Identifier: MIT
-   pragma solidity ^0.8.0;
-   contract StakingContract {
-       // ...
+   {
+     "mode": "DEVELOPMENT",
+     "message": "Below are the development files and their explanations for your project:",
+     "project": "Multi-Token Staking",
+     "files": [
+       {
+         "filename": "StakingContract.sol",
+         "content": "// SPDX-License-Identifier: MIT\\npragma solidity ^0.8.0;\\ncontract StakingContract { ... }",
+         "language": "sol",
+         "explanation": "This Solidity file contains the core logic for staking tokens and managing rewards.",
+         "lastModified": "2025-02-09T12:00:00.000Z"
+       },
+       {
+         "filename": "README.md",
+         "content": "# Multi-Token Staking\\nA brief description of the project...",
+         "language": "md",
+         "explanation": "This markdown file documents the project features and setup instructions."
+       }
+     ],
+     "general_message": "I have updated the Solidity contract and README file for your review. <more details about the changes...>"
    }
-   \`\`\`
 
-   File 2: README.md
-   \`\`\`md
-   # Multi-Token Staking
-    <A brief description of the project>
-
-    ## Requirements
-    - Requirement 1
-    - Requirement 2
-   ...
-   \`\`\`
-
-
-
-   3) RESEARCH
-   - Start with "RESEARCH" on its own line.
-   - Summarize your research or analysis in bullet points or short sections.
+3) RESEARCH
+   - JSON must include:
+     - "mode": "RESEARCH"
+     - "message": "Here is the comprehensive research analysis for your project:"
+     - "project": A short description of the project.
+     - "overview": A brief overview of the research topic.
+     - "research": Detailed research or analysis information.
+     - "key_features": An array of key feature strings.
+     - "explanations": An object that elaborates on:
+         - "methodology": Explanation of the research approach.
+         - "key_features": Rationale behind the selection of key features.
+         - "assumptions": Any assumptions made during the research.
+     - "market_analysis": Insights on market trends or competitor landscape.
+     - "risk_analysis": An object with risk levels (e.g., { "high": "...", "medium": "...", "low": "..." }).
+     - Optionally, "general_message": Any extra research insights.
 
    Example:
-   RESEARCH
-   Project: Multi-Token Staking
-   - Overview: High-level DeFi analysis
-   - Research: High Complexity
-   - Key Features: 3
-      -Multi-token Support
-      -Yield Optimization
-      -Flash Loans
-   - Market Analysis, key competitors, etc.
-   - Risk Analysis: 3
-    - High Risk:Smart contract vulnerabilities
-    - Medium Risk:Market volatility impact
-    - Low Risk:Regulatory compliance (with KYC)
+   {
+     "mode": "RESEARCH",
+     "message": "Here is the comprehensive research analysis for your project:",
+     "project": "Multi-Token Staking",
+     "overview": "High-level DeFi analysis",
+     "research": "In-depth analysis covering integration challenges and yield strategies.",
+     "key_features": ["Multi-token Support", "Yield Optimization", "Flash Loans"],
+     "explanations": {
+       "methodology": "Research was conducted using market surveys, competitor benchmarks, and technical analysis.",
+       "key_features": "Each feature was selected to enhance functionality and user appeal.",
+       "assumptions": "Assumes stable market conditions and sufficient liquidity."
+     },
+     "market_analysis": "The market shows increasing interest in diversified staking options with competitive yields.",
+     "risk_analysis": {
+       "high": "Smart contract vulnerabilities require rigorous testing.",
+       "medium": "Market volatility might affect yield consistency.",
+       "low": "Regulatory risks can be mitigated through compliance measures."
+     },
+     "general_message": "Comprehensive research with detailed explanations for informed decision-making."
+   }
 
-   4) AUDIT
-   - Start with "AUDIT" on its own line.
-   - Provide security checks, vulnerabilities, or recommendations in bullet points.
+4) AUDIT
+   - user would have sent the files to check for the known issues.
+   - only list the things you have done, not the things you haven't done.
+   - check for the files from the user and then check if any of them have any of the know issues and tell about the issues you checked for.
+   - ask user if they have any specific concerns.
+   - recommend the user you can do the fixes if you find any issues.
+
+   - JSON must include:
+     - "mode": "AUDIT"
+     - "message": "Here is the audit report with security checks and recommendations for your project:"
+     - "checks": An array of strings or objects representing each security check or recommendation.
+     - "explanations": An object mapping each check to a detailed explanation of its importance and impact.
+     - Optionally, "general_message": Additional commentary regarding the audit process.
 
    Example:
-   AUDIT
-   - Check 1: Reentrancy guard
-   - Check 2: OnlyOwner for sensitive functions
-   - Recommended fix: Use OZ libraries
+   {
+     "mode": "AUDIT",
+     "message": "Here is the audit report with security checks and recommendations for your project:",
+     "checks": [
+       "Reentrancy guard is implemented",
+       "OnlyOwner modifier is used",
+     ],
+     "failed_checks": [
+        "No input validation",
+        "No access control"
+      ],
+     "explanations": {
+       "Reentrancy guard": "Prevents attackers from calling functions repeatedly before previous executions complete, mitigating fund draining risks.",
+       "OnlyOwner modifier": "Ensures that only the contract owner can execute critical functions, protecting against unauthorized access.",
+     },
+     failed_explanations: {
+        "No input validation": "Lack of input validation can lead to unexpected behavior or vulnerabilities due to unchecked user input.",
+        "No access control": "Missing access control mechanisms can allow unauthorized users to execute privileged functions, compromising the contract's security."
+      },
+     "general_message": "Audit completed with in-depth explanations for each security measure."
+   }
 
 5) DEPLOYMENT
-   - Start with "DEPLOYMENT" on its own line.
-   - List steps or instructions in bullet points (e.g., "- Step 1: <...>").
-   - Optionally mention next steps or mainnet vs testnet.
+   - user would have sent the files to deploy.
+   - JSON must include:
+     - "mode": "DEPLOYMENT"
+     - "message": "<Your message here>"
+     - "deployment_steps": An array of step-by-step instructions.
+       (For deployment, you must use the CDP toolkit to request testnet funds from the faucet and then deploy on the testnet.)
+     - "abi": The contract ABI (provided as an array or string).
+     - "contract_address": The deployed contract address.
+     - "transaction_url": A URL to view the deployment transaction.
+     - "explanations": An object where each deployment step is further explained to describe its purpose and importance.
+     - Optionally, "general_message": Any additional notes regarding the deployment. Did it pass or fail? or if you need anything else from the user.
 
    Example:
-   DEPLOYMENT
-   - Deployment Steps: 3
-   Step 1: Compile
-   Step 2: Deploy on testnet using cdp toolkit
-   Step 3: Verify on block explorer
-
-   give the abi, address and explain use of the contract
+   {
+     "mode": "DEPLOYMENT",
+     "message": "Here are the detailed deployment steps along with contract details for your project:",
+     "deployment_steps": [
+       "Step 1: Compile the contract",
+       "Step 2: Use the CDP toolkit to request testnet funds from the faucet",
+       "Step 3: Deploy the contract on the testnet",
+       "Step 4: Verify the contract on a block explorer"
+     ],
+     "abi": "[ { ... } ]",
+     "contract_address": "0xABC123...",
+     "transaction_url": "https://sepolia.basescan.org/tx/0x...",
+     "explanations": {
+       "Step 1": "Compilation ensures the contract is syntactically correct and optimized.",
+       "Step 2": "Requesting funds is necessary for covering deployment gas fees on the testnet.",
+       "Step 3": "Deploying on the testnet allows real-world testing without risking real funds.",
+       "Step 4": "Verification on a block explorer increases transparency and user trust."
+     },
+     "general_message": "Deployment successful using the CDP toolkit with comprehensive explanations."
+   }
 
 6) GENERAL
-   - Start with "GENERAL" on its own line.
-   - Provide a direct, helpful answer if none of the above modes apply.
+   - JSON must include:
+     - "mode": "GENERAL"
+     - "message": A direct and helpful answer to the user's query.
 
-No matter what, choose the best matching mode. If uncertain, use GENERAL.
+   Example:
+   {
+     "mode": "GENERAL",
+     "message": "<Your message here>",
+   }
+
+Instructions:
+- Analyze the user’s message and choose the best matching mode.
+- Provide your entire answer as valid JSON following the structures above.
+- Include any extra or miscellaneous information in the "general_message" field.
+- Do not output any additional text outside the JSON.
+- make sure to output in json format with the required keys. and the output should be a valid json object.
 `.trim();
-
 
 //-------------------------------------------------------
 // In-memory session store & queue
@@ -233,7 +335,7 @@ function validateEnvironment(): void {
 /***************************************************
  * Create a brand-new agent for a chat session
  ***************************************************/
-async function createNewAgent(): Promise<{
+async function createNewAgent( model = "gpt-4o-mini"): Promise<{
   agent: ReturnType<typeof createReactAgent>;
   agentConfig: Record<string, any>;
 }> {
@@ -242,7 +344,7 @@ async function createNewAgent(): Promise<{
 
   // 2) Initialize the LLM
   const llm = new ChatOpenAI({
-    model: "gpt-4o",
+    model: model,
     temperature: 0.7,
   });
 
@@ -321,7 +423,11 @@ If you cannot do something with the current tools, politely explain that it is n
  ***************************************************/
 async function cleanupSession(chatId: string) {
   if (SESSIONS[chatId]) {
-    console.log(`Session [${chatId}] inactive for ${SESSION_INACTIVITY_MS/1000/60} minutes. Cleaning up.`);
+    console.log(
+      `Session [${chatId}] inactive for ${
+        SESSION_INACTIVITY_MS / 1000 / 60
+      } minutes. Cleaning up.`
+    );
     delete SESSIONS[chatId];
 
     // Process next queued session if any
@@ -343,9 +449,14 @@ async function cleanupSession(chatId: string) {
             inactivityTimer,
           };
 
-          console.log(`Processed queued session [${nextSession.chatId}]. Queue length: ${QUEUE.length}`);
+          console.log(
+            `Processed queued session [${nextSession.chatId}]. Queue length: ${QUEUE.length}`
+          );
         } catch (error) {
-          console.error(`Failed to process queued session [${nextSession.chatId}]:`, error);
+          console.error(
+            `Failed to process queued session [${nextSession.chatId}]:`,
+            error
+          );
           // Put it back in queue if failed
           QUEUE.unshift(nextSession);
         }
@@ -361,15 +472,12 @@ function resetInactivityTimer(chatId: string) {
   const session = SESSIONS[chatId];
   if (!session) return;
 
-  // Clear the old timer
   clearTimeout(session.inactivityTimer);
 
-  // Set a new timer
   session.inactivityTimer = setTimeout(() => {
     cleanupSession(chatId);
   }, SESSION_INACTIVITY_MS);
 
-  // Update lastActive timestamp
   session.lastActive = Date.now();
 }
 
@@ -387,19 +495,17 @@ app.post("/api/start-chat", async (req, res) => {
       return res.status(400).json({ error: "That chatId is already in use." });
     }
 
-    // If we have 50 active sessions, push to a queue for demo
-    // In real logic, you might have a better approach.
     const activeCount = Object.keys(SESSIONS).length;
     if (activeCount >= MAX_ACTIVE_SESSIONS) {
       console.log(`Active sessions = ${activeCount}, pushing chat [${chatId}] to queue.`);
       QUEUE.push({ chatId });
-      return res.json({ message: `Queue is full (${MAX_ACTIVE_SESSIONS}). Your request has been queued.` });
+      return res.json({
+        message: `Queue is full (${MAX_ACTIVE_SESSIONS}). Your request has been queued.`,
+      });
     }
 
-    // Otherwise, create a new agent session
     const { agent, agentConfig } = await createNewAgent();
 
-    // Store it
     const inactivityTimer = setTimeout(() => {
       cleanupSession(chatId);
     }, SESSION_INACTIVITY_MS);
@@ -413,20 +519,22 @@ app.post("/api/start-chat", async (req, res) => {
 
     logger.log({
       chatId,
-      sender: 'SYSTEM',
-      message: 'New chat session started',
-      status: 'SUCCESS'
+      sender: "SYSTEM",
+      message: "New chat session started",
+      status: "SUCCESS",
     });
 
-    console.log(`Created new session [${chatId}]. Active sessions: ${Object.keys(SESSIONS).length}`);
+    console.log(
+      `Created new session [${chatId}]. Active sessions: ${Object.keys(SESSIONS).length}`
+    );
 
     return res.json({ message: `Session [${chatId}] created successfully!` });
   } catch (error) {
     logger.log({
-      chatId: req.body.chatId || 'UNKNOWN',
-      sender: 'SYSTEM',
+      chatId: req.body.chatId || "UNKNOWN",
+      sender: "SYSTEM",
       message: `Error: ${error}`,
-      status: 'ERROR'
+      status: "ERROR",
     });
     console.error("Error in /api/start-chat:", error);
     return res.status(500).json({ error: String(error) });
@@ -446,24 +554,23 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Missing 'userMessage' in request body." });
     }
 
-    // limit userMessage to 5000 characters
     const trimmedUserMessage = userMessage.slice(0, 5000);
 
-    // Log user message
     logger.log({
       chatId,
-      sender: 'USER',
-      message: userMessage
+      sender: "USER",
+      message: userMessage,
     });
 
-    // Check if session exists
     let session = SESSIONS[chatId];
     if (!session) {
       const activeCount = Object.keys(SESSIONS).length;
       if (activeCount >= MAX_ACTIVE_SESSIONS) {
         console.log(`Active sessions = ${activeCount}, pushing chat [${chatId}] to queue.`);
         QUEUE.push({ chatId });
-        return res.json({ message: `Queue is full (${MAX_ACTIVE_SESSIONS}). Your request has been queued.` });
+        return res.json({
+          message: `Queue is full (${MAX_ACTIVE_SESSIONS}). Your request has been queued.`,
+        });
       }
 
       const { agent, agentConfig } = await createNewAgent();
@@ -481,13 +588,12 @@ app.post("/api/chat", async (req, res) => {
 
       logger.log({
         chatId,
-        sender: 'SYSTEM',
-        message: 'Created new chat session automatically for /api/chat request',
-        status: 'SUCCESS'
+        sender: "SYSTEM",
+        message: "Created new chat session automatically for /api/chat request",
+        status: "SUCCESS",
       });
     }
 
-    // Reset inactivity timer
     resetInactivityTimer(chatId);
 
     let specializedPrompt = `
@@ -501,92 +607,100 @@ app.post("/api/chat", async (req, res) => {
       User message: "${trimmedUserMessage}"
     `;
 
-    // 3) Send to AI and collect response
     const agentStream = await session.agent.stream(
       { messages: [new HumanMessage(specializedPrompt)] },
       session.agentConfig
     );
 
-    // 4) Process the response
-    let responseText = "";
-    let codeBlocks: string[] = []; // Add type annotation here
-    let currentBlock = "";
-    let inCodeBlock = false;
+    let aggregatedResponse = "";
 
     for await (const chunk of agentStream) {
       if ("agent" in chunk) {
         const content = chunk.agent.messages[0].content;
         const usage = chunk.agent.messages[0]?.response_metadata?.tokenUsage;
-        // Parse content for code blocks
-        const lines = content.split('\n');
-        for (const line of lines) {
-          if (line.includes('```')) {
-            if (inCodeBlock) {
-              codeBlocks.push(currentBlock);
-              currentBlock = "";
-            }
-            inCodeBlock = !inCodeBlock;
-          } else if (inCodeBlock) {
-            currentBlock += line + '\n';
-          } else {
-            responseText += line + '\n';
-          }
-        }
+
+        aggregatedResponse += content;
 
         if (usage) {
           logger.log({
             chatId,
-            sender: 'AI',
+            sender: "AI",
             message: `Token Usage: prompt=${usage.promptTokens}, completion=${usage.completionTokens}, total=${usage.totalTokens}`,
-            tokenUsage: usage
+            tokenUsage: usage,
           });
         }
       } else if ("tools" in chunk) {
-        responseText += `(TOOL-LOG) ${chunk.tools.messages[0].content}\n`;
+        aggregatedResponse += `(TOOL-LOG) ${chunk.tools.messages[0].content}`;
       }
     }
-    const mode = responseText.split('\n')[0]?.trim().toUpperCase() || 'GENERAL';
 
-
-    // After AI response
-    logger.log({
-      chatId,
-      sender: 'AI',
-      message: responseText,
-      mode,
-      status: 'COMPLETE'
-    });
-
-    if (codeBlocks.length > 0) {
+    let parsedJson: any;
+    try {
+      // Attempt to parse the ```json inside response string
+      // if ```json is present, remove just first and last line as there might be more json in between
+      const jsonValue = aggregatedResponse.startsWith("```json")
+        ? aggregatedResponse.split("\n").slice(1, -1).join("\n")
+        : aggregatedResponse;
+      parsedJson = JSON.parse(jsonValue.trim());
+    } catch (parseError) {
       logger.log({
         chatId,
-        sender: 'AI',
-        message: `Generated ${codeBlocks.length} code blocks`,
-        mode: 'CODE'
+        sender: "SYSTEM",
+        message: "Failed to parse agent response as JSON. Returning fallback.\n\nResponse:\n" + aggregatedResponse,
+        status: "ERROR",
       });
+      parsedJson = {
+        mode: "GENERAL",
+        message: aggregatedResponse,
+        general_message:
+          "The system could not parse or generate the correct JSON structure.",
+      };
     }
 
-    // 5) Return structured response
-    return res.json({
-      mode,
-      response: responseText.trim(),
-      codeBlocks,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        model: "gpt-4o-mini",
-        sessionId: chatId
-      }
+    if (!parsedJson.mode || !parsedJson.message) {
+      logger.log({
+        chatId,
+        sender: "SYSTEM",
+        message: "Agent response missing required keys. Returning fallback.",
+        status: "ERROR",
+      });
+      parsedJson = {
+        mode: "GENERAL",
+        message: "An error occurred while processing your request.",
+        general_message:
+          "The system returned incomplete JSON (missing 'mode' or 'message').",
+      };
+    }
+
+    parsedJson.metadata = {
+      timestamp: new Date().toISOString(),
+      sessionId: chatId,
+      model: "gpt-4o-mini",
+    };
+
+    logger.log({
+      chatId,
+      sender: "AI",
+      message: "Returning final JSON response to user.",
+      mode: parsedJson.mode,
+      status: "COMPLETE",
     });
 
+    return res.json(parsedJson);
   } catch (err) {
     logger.log({
-      chatId: req.body.chatId || 'UNKNOWN',
-      sender: 'SYSTEM',
+      chatId: req.body.chatId || "UNKNOWN",
+      sender: "SYSTEM",
       message: `Error: ${err}`,
-      status: 'ERROR'
+      status: "ERROR",
     });
     console.error("Error in /api/chat:", err);
-    return res.status(500).json({ error: String(err) });
+
+    return res.status(500).json({
+      mode: "GENERAL",
+      message: "An error occurred while processing your request.",
+      general_message: String(err),
+    });
   }
 });
 
@@ -613,7 +727,7 @@ app.get("/", (req, res) => {
 
 // Add before the root endpoint handler
 app.get("/test", (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'test.html'));
+  res.sendFile(path.join(__dirname, "public", "test.html"));
 });
 
 export { app };

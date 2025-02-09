@@ -12,7 +12,8 @@ import {
   Send,
   Trash2,
   Wallet,
-  Zap
+  Zap,
+  X
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import SplitPane from "react-split-pane";
@@ -44,6 +45,8 @@ interface Message {
   securityChecks?: string[];
   aiSuggestions?: string[];
   status?: "pending" | "complete" | "error";
+  mode?: string;
+  requirements?: string[];
 }
 
 interface CodeFile {
@@ -317,6 +320,11 @@ function Home() {
     }
   };
 
+  // Add a helper for removing a single suggested requirement
+  const handleRemoveSuggestion = (index: number) => {
+    setSuggestedRequirements((prev) => prev.filter((_, i) => i !== index));
+  };
+
   /* ------------------------------------------------------------------
        generateContract
   --------------------------------------------------------------------*/
@@ -421,7 +429,8 @@ function Home() {
     if (
       lowerInput.includes("audit") ||
       lowerInput.includes("deploy") ||
-      lowerInput.includes("develop")
+      lowerInput.includes("develop") ||
+      ["audit", "deploy"].includes(activeBottomTab)
     ) {
       attachFiles = true;
     }
@@ -470,7 +479,7 @@ function Home() {
         setActiveBottomTab("requirements");
 
         setRequirementsData(data); // Store entire data in state
-        localStorage.setItem("requirementsData", JSON.stringify(data));
+        localStorage.setItem("requirements", JSON.stringify(data.requirements));
 
         // If we get an array of requirements from the server, mark them as suggestions
         if (Array.isArray(data.requirements)) {
@@ -549,14 +558,16 @@ function Home() {
       // We'll stringify the entire JSON so you can see it in the chat bubble
       const aiMsg: Message = {
         id: oldMessages.length + 2,
-        content: JSON.stringify(data, null, 2),
+        content: data.message || "",
         sender: "ai",
         agentId,
         timestamp: new Date(),
         codeBlocks: [generatedContract],
         securityChecks: latestSecurityChecks,
         aiSuggestions: aiSuggestions,
-        status: "complete"
+        status: "complete",
+        mode,
+        requirements: data.requirements
       };
 
       setAgentMessages({
@@ -767,18 +778,15 @@ function Home() {
                               <pre className="text-sm lg:text-base overflow-x-auto whitespace-pre-wrap">
                                 {message.content}
                               </pre>
-                              {message.codeBlocks?.length ? (
-                                <div className="mt-3 space-y-2">
-                                  {message.codeBlocks.map((block, idx) => (
-                                    <pre
-                                      key={idx}
-                                      className="bg-gray-900 text-green-400 p-3 rounded-lg text-xs lg:text-sm overflow-x-auto"
-                                    >
-                                      {block}
-                                    </pre>
+                              {message.mode === "REQUIREMENTS" && Array.isArray(message.requirements) && (
+                                <div className="mt-2 space-y-2">
+                                  {message.requirements.map((req, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 text-sm">
+                                      <span>{req}</span>
+                                    </div>
                                   ))}
                                 </div>
-                              ) : null}
+                              )}
 
                               {/* AI suggestions / security checks */}
                               {message.securityChecks?.length ? (
@@ -916,6 +924,47 @@ function Home() {
                     </button>
                   </div>
                   {/* List each requirement */}
+                  {suggestedRequirements.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-md font-semibold mb-2">Suggested Requirements</h3>
+                      <ul className="space-y-2">
+                        {suggestedRequirements.map((item, idx) => (
+                          <li key={idx} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={item.selected}
+                              onChange={() => handleToggleSuggestion(idx)}
+                              className="h-4 w-4"
+                            />
+                            <span className="text-sm">{item.text}</span>
+                            {/* Button to remove this single suggestion */}
+                            <button
+                              onClick={() => handleRemoveSuggestion(idx)}
+                              className="text-gray-400 hover:text-red-500"
+                              title="Remove this suggestion"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={handleAddSelectedSuggestions}
+                          className="bg-green-500 text-white px-3 py-1 rounded-md text-sm"
+                        >
+                          Add Selected
+                        </button>
+                        {/* Discard all suggested requirements */}
+                        <button
+                          onClick={() => setSuggestedRequirements([])}
+                          className="bg-red-500 text-white px-3 py-1 rounded-md text-sm"
+                        >
+                          Discard All
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {requirements.length > 0 && (
                     <ul className="space-y-3">
                       {requirements.map((req, idx) => (
@@ -933,30 +982,6 @@ function Home() {
                         </li>
                       ))}
                     </ul>
-                  )}
-                  {suggestedRequirements.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="text-md font-semibold mb-2">Suggested Requirements</h3>
-                      <ul className="space-y-2">
-                        {suggestedRequirements.map((item, idx) => (
-                          <li key={idx} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={item.selected}
-                              onChange={() => handleToggleSuggestion(idx)}
-                              className="h-4 w-4"
-                            />
-                            <span className="text-sm">{item.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        onClick={handleAddSelectedSuggestions}
-                        className="mt-2 bg-green-500 text-white px-3 py-1 rounded-md text-sm"
-                      >
-                        Add Selected
-                      </button>
-                    </div>
                   )}
                 </div>
               )}
