@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chat Interface</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Titan AI Chat Interface</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -40,7 +40,7 @@
             margin: 10px 0;
             padding: 10px;
             border-radius: 5px;
-            text-wrap: auto;
+            white-space: pre-wrap; /* ensures JSON displays properly */
         }
         .user-message {
             background-color: #e9ecef;
@@ -56,7 +56,7 @@
     <h1>AI Chat Interface</h1>
     <div id="chat-container"></div>
     <div id="input-container">
-        <input type="text" id="message-input" placeholder="Type your message...">
+        <input type="text" id="message-input" placeholder="Type your message..."/>
         <button id="send-button">Send</button>
     </div>
 
@@ -80,16 +80,19 @@
         }
 
         async function sendMessage(message) {
+            // If the session hasn't started yet, start it first
             if (!isSessionStarted) {
                 await startChat();
             }
 
-            const messageDiv = document.createElement('pre');
-            messageDiv.className = 'message user-message';
-            messageDiv.textContent = message;
-            chatContainer.appendChild(messageDiv);
+            // Display the user message
+            const userMessageDiv = document.createElement('pre');
+            userMessageDiv.className = 'message user-message';
+            userMessageDiv.textContent = message;
+            chatContainer.appendChild(userMessageDiv);
 
             try {
+                // Send message to backend
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -97,21 +100,25 @@
                 });
                 const data = await response.json();
 
+                // Display the AI response as JSON for clarity
                 const botMessageDiv = document.createElement('pre');
                 botMessageDiv.className = 'message bot-message';
-                botMessageDiv.textContent = data.response;
+                botMessageDiv.textContent = JSON.stringify(data, null, 2);
                 chatContainer.appendChild(botMessageDiv);
 
+                // Scroll to the bottom
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             } catch (error) {
                 console.error('Error sending message:', error);
             }
         }
 
+        // DOM elements
         const chatContainer = document.getElementById('chat-container');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
 
+        // Click handler
         sendButton.addEventListener('click', () => {
             const message = messageInput.value.trim();
             if (message) {
@@ -120,6 +127,7 @@
             }
         });
 
+        // Enter key handler
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 const message = messageInput.value.trim();
