@@ -2,6 +2,7 @@
  * server.ts
  ***************************************************/
 import express from "express";
+import cors from "cors";
 import {
   AgentKit,
   CdpWalletProvider,
@@ -20,12 +21,15 @@ import { ChatOpenAI } from "@langchain/openai";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import { logger } from './utils/logger';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
+app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 //-------------------------------------------------------
 // Specialized Prompts: Read from env variables or default
@@ -67,6 +71,112 @@ const PROMPT_GENERAL =
   `
 The user has a general question. Provide a helpful response.
 `.trim();
+
+//-------------------------------------------------------
+// Base instructions for how to format each mode's output
+//-------------------------------------------------------
+const BASE_INSTRUCTIONS = `
+You are Titan AI, an agent that responds in one of these modes:
+[requirements, research, development, audit, deployment, general].
+
+1) REQUIREMENTS
+   - Start with "REQUIREMENTS" on its own line.
+   - Then "Project: <short name/description>".
+   - Then use bullet points (e.g., "- Requirement 1").
+
+   Example:
+   REQUIREMENTS
+   <Here are some suggested requirements for the project with brief explaining why>
+   Project: Multi-Token Staking
+   - Users can stake multiple tokens
+   - Rewards distributed every 7 days
+
+2) DEVELOPMENT
+   - Start with "DEVELOPMENT" on its own line.
+   - Then "Project: <name or short description>".
+   - Then "Files: N" listing each file.
+   - For each file, print "File X: <filename>" and enclose contents in triple backticks (e.g. \`\`\`sol).
+
+   Example:
+   DEVELOPMENT
+   Project: Multi-Token Staking
+   Files: 2
+     - File 1: StakingContract.sol
+     - File 2: README.md
+     - File 3: <...> (any important files)
+
+   File 1: StakingContract.sol
+   \`\`\`sol
+   // SPDX-License-Identifier: MIT
+   pragma solidity ^0.8.0;
+   contract StakingContract {
+       // ...
+   }
+   \`\`\`
+
+   File 2: README.md
+   \`\`\`md
+   # Multi-Token Staking
+    <A brief description of the project>
+
+    ## Requirements
+    - Requirement 1
+    - Requirement 2
+   ...
+   \`\`\`
+
+
+
+   3) RESEARCH
+   - Start with "RESEARCH" on its own line.
+   - Summarize your research or analysis in bullet points or short sections.
+
+   Example:
+   RESEARCH
+   Project: Multi-Token Staking
+   - Overview: High-level DeFi analysis
+   - Research: High Complexity
+   - Key Features: 3
+      -Multi-token Support
+      -Yield Optimization
+      -Flash Loans
+   - Market Analysis, key competitors, etc.
+   - Risk Analysis: 3
+    - High Risk:Smart contract vulnerabilities
+    - Medium Risk:Market volatility impact
+    - Low Risk:Regulatory compliance (with KYC)
+
+   4) AUDIT
+   - Start with "AUDIT" on its own line.
+   - Provide security checks, vulnerabilities, or recommendations in bullet points.
+
+   Example:
+   AUDIT
+   - Check 1: Reentrancy guard
+   - Check 2: OnlyOwner for sensitive functions
+   - Recommended fix: Use OZ libraries
+
+5) DEPLOYMENT
+   - Start with "DEPLOYMENT" on its own line.
+   - List steps or instructions in bullet points (e.g., "- Step 1: <...>").
+   - Optionally mention next steps or mainnet vs testnet.
+
+   Example:
+   DEPLOYMENT
+   - Deployment Steps: 3
+   Step 1: Compile
+   Step 2: Deploy on testnet using cdp toolkit
+   Step 3: Verify on block explorer
+
+   give the abi, address and explain use of the contract
+
+6) GENERAL
+   - Start with "GENERAL" on its own line.
+   - Provide a direct, helpful answer if none of the above modes apply.
+
+No matter what, choose the best matching mode. If uncertain, use GENERAL.
+`.trim();
+
 
 //-------------------------------------------------------
 // In-memory session store & queue
@@ -132,7 +242,7 @@ async function createNewAgent(): Promise<{
 
   // 2) Initialize the LLM
   const llm = new ChatOpenAI({
-    model: "gpt-4o-mini",
+    model: "gpt-4o",
     temperature: 0.7,
   });
 
@@ -192,11 +302,11 @@ async function createNewAgent(): Promise<{
     llm,
     tools,
     checkpointSaver: memory,
-    messageModifier: `
-      You are a helpful agent that can interact onchain using the Coinbase Developer Platform (CDP) AgentKit.
-      If you ever need funds, you can request them from a faucet if on 'base-sepolia'.
-      If you cannot do something with the current tools, politely explain that it is not supported.
-    `,
+    // Insert the base instructions at the start
+    messageModifier: `${BASE_INSTRUCTIONS}\n\nYou are a helpful agent that can interact onchain using the Coinbase Developer Platform (CDP) AgentKit.
+If you ever need funds, you can request them from a faucet if on 'base-sepolia'.
+If you cannot do something with the current tools, politely explain that it is not supported.
+`,
   });
 
   // 10) Export wallet data so we can persist it
@@ -209,10 +319,38 @@ async function createNewAgent(): Promise<{
 /***************************************************
  * Clean up a session if inactive
  ***************************************************/
-function cleanupSession(chatId: string) {
+async function cleanupSession(chatId: string) {
   if (SESSIONS[chatId]) {
-    console.log(`Session [${chatId}] inactive for 10 mins. Cleaning up.`);
+    console.log(`Session [${chatId}] inactive for ${SESSION_INACTIVITY_MS/1000/60} minutes. Cleaning up.`);
     delete SESSIONS[chatId];
+
+    // Process next queued session if any
+    if (QUEUE.length > 0) {
+      const nextSession = QUEUE.shift();
+      if (nextSession) {
+        try {
+          // Create new agent for queued session
+          const { agent, agentConfig } = await createNewAgent();
+
+          const inactivityTimer = setTimeout(() => {
+            cleanupSession(nextSession.chatId);
+          }, SESSION_INACTIVITY_MS);
+
+          SESSIONS[nextSession.chatId] = {
+            agent,
+            agentConfig,
+            lastActive: Date.now(),
+            inactivityTimer,
+          };
+
+          console.log(`Processed queued session [${nextSession.chatId}]. Queue length: ${QUEUE.length}`);
+        } catch (error) {
+          console.error(`Failed to process queued session [${nextSession.chatId}]:`, error);
+          // Put it back in queue if failed
+          QUEUE.unshift(nextSession);
+        }
+      }
+    }
   }
 }
 
@@ -273,10 +411,23 @@ app.post("/api/start-chat", async (req, res) => {
       inactivityTimer,
     };
 
+    logger.log({
+      chatId,
+      sender: 'SYSTEM',
+      message: 'New chat session started',
+      status: 'SUCCESS'
+    });
+
     console.log(`Created new session [${chatId}]. Active sessions: ${Object.keys(SESSIONS).length}`);
 
     return res.json({ message: `Session [${chatId}] created successfully!` });
   } catch (error) {
+    logger.log({
+      chatId: req.body.chatId || 'UNKNOWN',
+      sender: 'SYSTEM',
+      message: `Error: ${error}`,
+      status: 'ERROR'
+    });
     console.error("Error in /api/start-chat:", error);
     return res.status(500).json({ error: String(error) });
   }
@@ -295,77 +446,145 @@ app.post("/api/chat", async (req, res) => {
       return res.status(400).json({ error: "Missing 'userMessage' in request body." });
     }
 
+    // limit userMessage to 5000 characters
+    const trimmedUserMessage = userMessage.slice(0, 5000);
+
+    // Log user message
+    logger.log({
+      chatId,
+      sender: 'USER',
+      message: userMessage
+    });
+
     // Check if session exists
-    const session = SESSIONS[chatId];
+    let session = SESSIONS[chatId];
     if (!session) {
-      // Potentially check the queue here to see if we can now create it
-      // if a spot is open, etc. For simplicity, just error out.
-      return res.status(404).json({ error: `No active session found for chatId = ${chatId}.` });
+      const activeCount = Object.keys(SESSIONS).length;
+      if (activeCount >= MAX_ACTIVE_SESSIONS) {
+        console.log(`Active sessions = ${activeCount}, pushing chat [${chatId}] to queue.`);
+        QUEUE.push({ chatId });
+        return res.json({ message: `Queue is full (${MAX_ACTIVE_SESSIONS}). Your request has been queued.` });
+      }
+
+      const { agent, agentConfig } = await createNewAgent();
+      const inactivityTimer = setTimeout(() => {
+        cleanupSession(chatId);
+      }, SESSION_INACTIVITY_MS);
+
+      SESSIONS[chatId] = {
+        agent,
+        agentConfig,
+        lastActive: Date.now(),
+        inactivityTimer,
+      };
+      session = SESSIONS[chatId];
+
+      logger.log({
+        chatId,
+        sender: 'SYSTEM',
+        message: 'Created new chat session automatically for /api/chat request',
+        status: 'SUCCESS'
+      });
     }
 
     // Reset inactivity timer
     resetInactivityTimer(chatId);
 
-    // 1) Classify the user's message
-    const classificationPrompt = `
-      You will read the user's message and classify it into one of the following modes:
-      "requirements", "research", "development", "audit", "deployment", "general".
-      Provide only the single word: requirements, research, development, audit, deployment, or general.
+    let specializedPrompt = `
+      ${BASE_INSTRUCTIONS}
 
-      User message: "${userMessage}"
+      You will read the user's message and first determine which of the following modes best applies:
+      (requirements, research, development, audit, deployment, or general).
+
+      Then produce the response strictly in that mode's format described above. If it's unclear, use "general".
+
+      User message: "${trimmedUserMessage}"
     `;
-    const classificationStream = await session.agent.stream(
-      { messages: [new HumanMessage(classificationPrompt)] },
-      session.agentConfig
-    );
-    let classificationResponse = "";
-    for await (const chunk of classificationStream) {
-      if ("agent" in chunk) {
-        classificationResponse += chunk.agent.messages[0].content;
-      }
-    }
-    const rawMode = classificationResponse.trim().toLowerCase();
-    const allowedModes = ["requirements", "research", "development", "audit", "deployment", "general"];
-    const mode = allowedModes.includes(rawMode) ? rawMode : "general";
 
-    // 2) Build the specialized prompt based on the classification
-    let specializedPrompt = "";
-    if (mode === "requirements") {
-      specializedPrompt = PROMPT_REQUIREMENTS;
-    } else if (mode === "research") {
-      specializedPrompt = PROMPT_RESEARCH;
-    } else if (mode === "development") {
-      specializedPrompt = PROMPT_DEVELOPMENT;
-    } else if (mode === "audit") {
-      specializedPrompt = PROMPT_AUDIT;
-    } else if (mode === "deployment") {
-      specializedPrompt = PROMPT_DEPLOYMENT;
-    } else {
-      specializedPrompt = PROMPT_GENERAL;
-    }
-    specializedPrompt += ` User message: "${userMessage}"`;
-
-    // 3) Send the specialized prompt to the agent
+    // 3) Send to AI and collect response
     const agentStream = await session.agent.stream(
       { messages: [new HumanMessage(specializedPrompt)] },
       session.agentConfig
     );
 
-    let finalText = "";
+    // 4) Process the response
+    let responseText = "";
+    let codeBlocks: string[] = []; // Add type annotation here
+    let currentBlock = "";
+    let inCodeBlock = false;
+
     for await (const chunk of agentStream) {
       if ("agent" in chunk) {
-        finalText += chunk.agent.messages[0].content + "\n";
+        const content = chunk.agent.messages[0].content;
+        const usage = chunk.agent.messages[0]?.response_metadata?.tokenUsage;
+        // Parse content for code blocks
+        const lines = content.split('\n');
+        for (const line of lines) {
+          if (line.includes('```')) {
+            if (inCodeBlock) {
+              codeBlocks.push(currentBlock);
+              currentBlock = "";
+            }
+            inCodeBlock = !inCodeBlock;
+          } else if (inCodeBlock) {
+            currentBlock += line + '\n';
+          } else {
+            responseText += line + '\n';
+          }
+        }
+
+        if (usage) {
+          logger.log({
+            chatId,
+            sender: 'AI',
+            message: `Token Usage: prompt=${usage.promptTokens}, completion=${usage.completionTokens}, total=${usage.totalTokens}`,
+            tokenUsage: usage
+          });
+        }
       } else if ("tools" in chunk) {
-        finalText += `(TOOL-LOG) ${chunk.tools.messages[0].content}\n`;
+        responseText += `(TOOL-LOG) ${chunk.tools.messages[0].content}\n`;
       }
     }
+    const mode = responseText.split('\n')[0]?.trim().toUpperCase() || 'GENERAL';
 
-    // 5) Return a JSON response, including the mode
+
+    // After AI response
+    logger.log({
+      chatId,
+      sender: 'AI',
+      message: responseText,
+      mode,
+      status: 'COMPLETE'
+    });
+
+    if (codeBlocks.length > 0) {
+      logger.log({
+        chatId,
+        sender: 'AI',
+        message: `Generated ${codeBlocks.length} code blocks`,
+        mode: 'CODE'
+      });
+    }
+
+    // 5) Return structured response
     return res.json({
       mode,
-      response: finalText.trim(),
+      response: responseText.trim(),
+      codeBlocks,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        model: "gpt-4o-mini",
+        sessionId: chatId
+      }
     });
+
   } catch (err) {
+    logger.log({
+      chatId: req.body.chatId || 'UNKNOWN',
+      sender: 'SYSTEM',
+      message: `Error: ${err}`,
+      status: 'ERROR'
+    });
     console.error("Error in /api/chat:", err);
     return res.status(500).json({ error: String(err) });
   }
@@ -390,6 +609,11 @@ app.get("/api/session-status", (req, res) => {
  ***************************************************/
 app.get("/", (req, res) => {
   res.send("Server is running.");
+});
+
+// Add before the root endpoint handler
+app.get("/test", (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'test.html'));
 });
 
 export { app };

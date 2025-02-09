@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #chat-container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        #input-container {
+            display: flex;
+            gap: 10px;
+        }
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #ccc;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            text-wrap: auto;
+        }
+        .user-message {
+            background-color: #e9ecef;
+            margin-left: 20%;
+        }
+        .bot-message {
+            background-color: #f8f9fa;
+            margin-right: 20%;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI Chat Interface</h1>
+    <div id="chat-container"></div>
+    <div id="input-container">
+        <input type="text" id="message-input" placeholder="Type your message...">
+        <button id="send-button">Send</button>
+    </div>
+
+    <script>
+        const chatId = 'chat_' + Math.random().toString(36).substr(2, 9);
+        let isSessionStarted = false;
+
+        async function startChat() {
+            try {
+                const response = await fetch('/api/start-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatId })
+                });
+                const data = await response.json();
+                isSessionStarted = true;
+                console.log('Chat session started:', data);
+            } catch (error) {
+                console.error('Error starting chat:', error);
+            }
+        }
+
+        async function sendMessage(message) {
+            if (!isSessionStarted) {
+                await startChat();
+            }
+
+            const messageDiv = document.createElement('pre');
+            messageDiv.className = 'message user-message';
+            messageDiv.textContent = message;
+            chatContainer.appendChild(messageDiv);
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chatId, userMessage: message })
+                });
+                const data = await response.json();
+
+                const botMessageDiv = document.createElement('pre');
+                botMessageDiv.className = 'message bot-message';
+                botMessageDiv.textContent = data.response;
+                chatContainer.appendChild(botMessageDiv);
+
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            } catch (error) {
+                console.error('Error sending message:', error);
+            }
+        }
+
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        sendButton.addEventListener('click', () => {
+            const message = messageInput.value.trim();
+            if (message) {
+                sendMessage(message);
+                messageInput.value = '';
+            }
+        });
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const message = messageInput.value.trim();
+                if (message) {
+                    sendMessage(message);
+                    messageInput.value = '';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
