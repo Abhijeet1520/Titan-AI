@@ -11,7 +11,18 @@
 
 - **Project Name:** Titan AI Smart Contract Assist
 - **Category:** Artificial Intelligence 🤖
-- **Demo:** [View Demo](#)
+- **Demo:** [View Demo](https://titanai.abhi1520.com)
+
+
+<div>
+    <a href="https://www.loom.com/share/8176c9d1dbe54d68861277dbc97954d7">
+      <p>Building Your Business with Titan AI 🚀 - Watch Video</p>
+    </a>
+    <a href="https://www.loom.com/share/8176c9d1dbe54d68861277dbc97954d7">
+      <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/8176c9d1dbe54d68861277dbc97954d7-18f4ca705845a8dd-full-play.gif">
+    </a>
+  </div>
+
 
 ## ✨ Short Description
 
